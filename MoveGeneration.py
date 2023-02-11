@@ -1,15 +1,57 @@
 import numpy as np
 from Constants import *
 
+debruijn = np.uint64(0x03f79d71b4cb0a89)
+
+lsb_lookup = np.array(
+        [ 0,  1, 48,  2, 57, 49, 28,  3,
+         61, 58, 50, 42, 38, 29, 17,  4,
+         62, 55, 59, 36, 53, 51, 43, 22,
+         45, 39, 33, 30, 24, 18, 12,  5,
+         63, 47, 56, 27, 60, 41, 37, 16,
+         54, 35, 52, 21, 44, 32, 23, 11,
+         46, 26, 40, 15, 34, 20, 31, 10,
+         25, 14, 19,  9, 13,  8,  7,  6],
+        dtype=np.uint64)
+
+msb_lookup = np.array(
+        [ 0, 47,  1, 56, 48, 27,  2, 60,
+         57, 49, 41, 37, 28, 16,  3, 61,
+         54, 58, 35, 52, 50, 42, 21, 44,
+         38, 32, 29, 23, 17, 11,  4, 62,
+         46, 55, 26, 59, 40, 36, 15, 53,
+         34, 51, 20, 43, 31, 22, 10, 45,
+         25, 39, 14, 33, 19, 30,  9, 24,
+         13, 18,  8, 12,  7,  6,  5, 63],
+        dtype=np.uint64)
+
+def lsb_bitscan(bb):
+    return lsb_lookup[((bb & -bb) * debruijn) >> np.uint64(58)]
+
+def msb_bitscan(bb):
+    bb |= bb >> np.uint8(1)
+    bb |= bb >> np.uint8(2)
+    bb |= bb >> np.uint8(4)
+    bb |= bb >> np.uint8(8)
+    bb |= bb >> np.uint8(16)
+    bb |= bb >> np.uint8(32)
+    print(bb, debruijn)
+    print("here",(bb * debruijn))
+    return msb_lookup[(bb * debruijn) >> np.uint64(58)]
+
+
+
 class MoveGeneration():
     def __init__(self):
         self.clear_files = self.generate_clear_files()
         self.clear_ranks = self.generate_clear_ranks()
+        self.a1_h8_diag = np.uint64(0x8040201008040201)
+        self.h1_a8_antidiag = np.uint64(0x0102040810204080)
         # generate moves for each position on board for pawn, knight and king
         self.knight_moves = self.generate_knight_moves()
         self.pawn_moves = self.generate_pawn_moves()
         self.king_moves = self.generate_king_moves()
-
+        self.first_rank_moves = self.generate_first_rank_moves()
     def generate_clear_files(self):
         bb = np.zeros(8, dtype=np.uint64)
         bb[0] = 0x101010101010101
@@ -107,6 +149,45 @@ class MoveGeneration():
             king_pos = king_pos << np.uint8(1)
         return bb
 
+    def generate_first_rank_moves(self):
+        first_rank_moves = np.zeros((8, 256), dtype=np.uint8)
+        left_ray = lambda x: x - np.uint8(1)
+        right_ray = lambda x: (~x) & ~(x - np.uint8(1))
+
+        for i in range(8):
+            for occ in range(256):
+                x = np.uint8(1) << np.uint8(i)
+                occ_bb = np.uint8(occ)
+
+                left_attacks = left_ray(x)
+                left_blockers = left_attacks & occ_bb
+                if left_blockers != np.uint8(0):
+                    leftmost = np.uint8(1) << msb_bitscan(np.uint64(left_blockers))
+                    left_garbage = left_ray(leftmost)
+                    left_attacks ^= left_garbage
+
+                right_attacks = right_ray(x)
+                right_blockers = right_attacks & occ
+
+                if right_blockers != np.uint8(0):
+                    rightmost = np.uint8(1) << lsb_bitscan(np.uint64(right_blockers))
+                    right_garbage = right_ray(rightmost)
+                    right_attacks ^= right_garbage
+
+                first_rank_moves[i][occ] = left_attacks ^ right_attacks
+        return first_rank_moves
+    def generate_sliding_file_moves(self, i, occ):
+        f = i & np.uint8(7)
+        # Shift to A file
+        occ = self.clear_files[File.A] & (occ >> f)
+        # Map occupancy and index to first rank
+        occ = (self.a1_h8_diag * occ) >> np.uint8(56)
+        first_rank_index = (i ^ np.uint8(56)) >> np.uint8(3)
+        # Lookup moveset and map back to H file
+        occ = self.a1_h8_diag * self.FIRST_RANK_MOVES[first_rank_index][occ]
+        # Isolate H file and shift back to original file
+        return (self.clear_files[File.H] & occ) >> (f ^ np.uint8(7))
+
 if __name__=="__main__":
-    m = MoveGeneration().pawn_moves
-    print(m[Color.BLACK][PawnMoveType.ATTACK])
+    m = MoveGeneration().first_rank_moves
+    print(m)

@@ -1,4 +1,5 @@
 from enum import IntEnum
+import numpy as np
 
 WIDTH = 600
 HEIGHT = 600
@@ -55,3 +56,4 @@ class File(IntEnum):
 class PawnMoveType(IntEnum):
     NORMAL = 0
     ATTACK = 1
+
