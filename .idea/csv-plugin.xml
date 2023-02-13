@@ -45,6 +45,20 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\GUI.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\Game.py">
+          <value>
+            <Attribute>
+              <option name="separator" value=":" />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\Move.py">
           <value>
             <Attribute>

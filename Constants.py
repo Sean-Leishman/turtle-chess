@@ -6,6 +6,7 @@ HEIGHT = 600
 
 SQUARE_SIZE = WIDTH / 8
 
+EMPTY_BB = np.uint64(0)
 class Color(IntEnum):
     WHITE=0
     BLACK=1

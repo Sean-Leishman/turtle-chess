@@ -30,7 +30,6 @@ def load_and_scale_svg(filename, scale):
     figure = svgutils.compose.Figure(float(svg.height) * 2, float(svg.width) * 2, svg)
     figure.save('svgNew.svg')
     svg_string = open('svgNew.svg', "rt").read()
-    print(svg_string)
     return pygame.image.load(io.BytesIO(svg_string.encode()))
 
 def load_img(filename):
@@ -43,29 +42,43 @@ class GUI():
 
     def init_pieces_img(self):
         return {
-            'R': load_img("Images\\Chess_rlt45.svg"),
-            'N': load_img("Images\\Chess_nlt45.svg"),
-            'B': load_img("Images\\Chess_blt45.svg"),
-            'Q': load_img("Images\\Chess_qlt45.svg"),
-            'K': load_img("Images\\Chess_klt45.svg"),
-            'P': load_img("Images\\Chess_plt45.svg"),
-            'r': load_img("Images\\Chess_rdt45.svg"),
-            'n': load_img("Images\\Chess_ndt45.svg"),
-            'b': load_img("Images\\Chess_bdt45.svg"),
-            'q': load_img("Images\\Chess_qdt45.svg"),
-            'k': load_img("Images\\Chess_kdt45.svg"),
-            'p': load_img("Images\\Chess_pdt45.svg"),
-        }
+            Color.WHITE:{
+                Piece.ROOK: load_img("Images\\Chess_rlt45.svg"),
+                Piece.KNIGHT: load_img("Images\\Chess_nlt45.svg"),
+                Piece.BISHOP: load_img("Images\\Chess_blt45.svg"),
+                Piece.QUEEN: load_img("Images\\Chess_qlt45.svg"),
+                Piece.KING: load_img("Images\\Chess_klt45.svg"),
+                Piece.PAWN: load_img("Images\\Chess_plt45.svg"),
+            },
+            Color.BLACK: {
+                Piece.ROOK: load_img("Images\\Chess_rdt45.svg"),
+                Piece.KNIGHT: load_img("Images\\Chess_ndt45.svg"),
+                Piece.BISHOP: load_img("Images\\Chess_bdt45.svg"),
+                Piece.QUEEN: load_img("Images\\Chess_qdt45.svg"),
+                Piece.KING: load_img("Images\\Chess_kdt45.svg"),
+                Piece.PAWN: load_img("Images\\Chess_pdt45.svg"),
+            }}
 
-    def draw_window(self, board):
+    def draw_window(self, board, legal_moves, selected_piece=None):
         for i in range(8):
             for j in range(8):
                 if i % 2 == 0 and j % 2 == 0 or i % 2 == 1 and j % 2 ==1:
                     pygame.draw.rect(self.screen,(153, 102, 51),(i*SQUARE_SIZE,j*SQUARE_SIZE,SQUARE_SIZE,SQUARE_SIZE))
                 else:
                     pygame.draw.rect(self.screen, (255, 204, 153), (i * SQUARE_SIZE, j * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE))
-                if board[i][j] != "":
-                    self.screen.blit(self.piecesImg[board[i][j]],
+                if board[i][j] is not None:
+                    self.screen.blit(self.piecesImg[board[i][j][0]][board[i][j][1]],
                                      pygame.Rect(i * SQUARE_SIZE, j * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE))
+
+        if selected_piece is not None:
+            pygame.draw.rect(self.screen, (255, 0, 0),
+                             (selected_piece.coord_from[0] * SQUARE_SIZE, selected_piece.coord_from[1] * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE),
+                             2)
+            moves = legal_moves[selected_piece.coord_from[0]][selected_piece.coord_from[1]]
+            for move in moves:
+                print(move)
+                pygame.draw.rect(self.screen, (0, 255, 0),
+                                 (move[0] * SQUARE_SIZE, move[1] * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE),
+                                 2)
         pygame.display.update()
 
