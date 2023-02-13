@@ -35,8 +35,6 @@ def msb_bitscan(bb):
     bb |= bb >> np.uint8(8)
     bb |= bb >> np.uint8(16)
     bb |= bb >> np.uint8(32)
-    print(bb, debruijn)
-    print("here",(bb * debruijn))
     return msb_lookup[(bb * debruijn) >> np.uint64(58)]
 
 
@@ -47,6 +45,8 @@ class MoveGeneration():
         self.clear_ranks = self.generate_clear_ranks()
         self.a1_h8_diag = np.uint64(0x8040201008040201)
         self.h1_a8_antidiag = np.uint64(0x0102040810204080)
+        self.diag_masks = self.generate_diag_masks()
+        self.anti_diag_masks = self.generate_anti_diag_masks()
         # generate moves for each position on board for pawn, knight and king
         self.knight_moves = self.generate_knight_moves()
         self.pawn_moves = self.generate_pawn_moves()
@@ -184,9 +184,47 @@ class MoveGeneration():
         occ = (self.a1_h8_diag * occ) >> np.uint8(56)
         first_rank_index = (i ^ np.uint8(56)) >> np.uint8(3)
         # Lookup moveset and map back to H file
-        occ = self.a1_h8_diag * self.FIRST_RANK_MOVES[first_rank_index][occ]
+        occ = self.a1_h8_diag * self.first_rank_moves[first_rank_index][occ]
         # Isolate H file and shift back to original file
         return (self.clear_files[File.H] & occ) >> (f ^ np.uint8(7))
+
+    def generate_sliding_rank_moves(self, i, occ):
+        f = i & np.uint8(7)
+        occ = self.clear_ranks[i] & occ
+        occ = (self.clear_files[File.A] * occ) >> np.uint8(56)
+        occ = self.clear_files[File.A] * self.first_rank_moves[f][occ]
+        return self.clear_ranks[i] * occ
+
+    def generate_diag_masks(self):
+        diag_masks = np.zeros(8, dtype=np.uint64)
+        for i in range(8):
+            diag = 8 * (i & 7) - (i & 56)
+            north = -diag & (diag >> 31)
+            south = diag & (-diag >> 31)
+            diag_masks[i] = (self.a1_h8_diag >> np.uint8(south)) << np.uint8(north)
+        return diag_masks
+
+    def generate_anti_diag_masks(self):
+        anti_diag_masks = np.zeros(8, dtype=np.uint64)
+        for i in range(8):
+            diag = 56 - 8 * (i & 7) - (i & 56)
+            north = -diag & (diag >> 31)
+            south = diag & (-diag >> 31)
+            anti_diag_masks[i] = (self.h1_a8_antidiag >> np.uint8(south)) << np.uint8(north)
+        return anti_diag_masks
+    def generate_diag_moves(self, i, occ):
+        f = i & np.uint8(7)
+        occ = self.diag_masks[i] & occ
+        occ = (self.clear_files[File.A] * occ) >> np.uint8(56)
+        occ = self.clear_files[File.A] * self.first_rank_moves[f][occ]
+        return self.diag_masks[i] & occ
+
+    def generate_anti_diag_moves(self,i,occ):
+        f = i & np.uint8(7)
+        occ = self.anti_diag_masks[i] & occ
+        occ = (self.clear_files[File.A] * occ) >> np.uint8(56)
+        occ = self.clear_files[File.A] * self.first_rank_moves[f][occ]
+        return self.anti_diag_masks[i] & occ
 
 if __name__=="__main__":
     m = MoveGeneration().first_rank_moves
