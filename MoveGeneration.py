@@ -1,8 +1,17 @@
+from copy import deepcopy
+
 import numpy as np
+
 from Constants import *
 from Bitboard import *
+from Move import Move
 
+import time
 class MoveGenerator():
+    def __new__(cls):
+        if not hasattr(cls, 'instance'):
+            cls.instance = super(MoveGenerator, cls).__new__(cls)
+        return cls.instance
     def __init__(self):
         self.tables = MoveGenerationTable()
 
@@ -13,28 +22,102 @@ class MoveGenerator():
         return attacks | normals
 
     def get_knight_moves(self, src, board):
-        return self.tables.knight_moves[src] & ~board.color_occ[~board.color]
+        return self.tables.knight_moves[src] & ~board.color_occ[board.color]
 
+    def get_king_moves(self, src, board):
+        return self.tables.king_moves[src] & ~board.color_occ[board.color]
+
+    def get_bishop_moves(self, src, board):
+        return (self.tables.generate_diag_moves(src, board.occ) ^ self.tables.generate_anti_diag_moves(src, board.occ)) & ~board.color_occ[board.color]
+
+    def get_rook_moves(self, src, board):
+        return (self.tables.generate_sliding_rank_moves(src, board.occ) ^ self.tables.generate_sliding_file_moves(src, board.occ)) & ~board.color_occ[board.color]
+    def get_queen_moves(self, src, board):
+        return self.get_rook_moves(src, board) | self.get_bishop_moves(src, board)
     def generate_pseudo_legal_moves(self, board):
-        legal_moves = np.zeros(64, dtype=np.uint64)
+        legal_moves = []
         for piece in Piece:
             piece_bb = board.get_piece_bb(piece)
             for src in get_occupied_squares(piece_bb):
                 if piece == Piece.PAWN:
-                    legal_moves[src] = self.get_pawn_moves(src, board)
+                    moveset = self.get_pawn_moves(src, board)
                 elif piece == Piece.KNIGHT:
-                    legal_moves[src] = self.get_knight_moves(src, board)
+                    moveset = self.get_knight_moves(src, board)
+                elif piece == Piece.KING:
+                    moveset = self.get_king_moves(src, board)
                 elif piece == Piece.ROOK:
-                    pass
+                    moveset = self.get_rook_moves(src, board)
+                elif piece == Piece.BISHOP:
+                    moveset = self.get_bishop_moves(src, board)
+                elif piece == Piece.QUEEN:
+                    moveset = self.get_queen_moves(src, board)
+                else:
+                    moveset = []
+
+                for move in get_occupied_squares(moveset):
+                    legal_moves.append(Move(index_from=src, index_to=move))
+        end_time = time.process_time_ns()
         return legal_moves
 
+    def generate_legal_moves(self, board):
+        return list(filter(lambda x: not self.king_is_attacked(deepcopy(board), x), self.generate_pseudo_legal_moves(board)))
 
-class MoveGenerationTable():
+    def king_is_attacked(self, board, move=None, color=None):
+        if move is not None:
+            board = board.apply_move(move)
+
+        if color is None:
+            color = board.color
+
+        board.color = ~board.color
+        king_bb = board.get_piece_bb(Piece.KING)
+        king_pos = get_occupied_squares(king_bb)
+
+        opp_color = ~board.color
+
+        if len(king_pos) < 1:
+            return True
+
+        king_pos = king_pos[0]
+
+        opp_pawns = board.get_piece_bb(Piece.PAWN, opp_color)
+        if (self.tables.pawn_moves[color][PawnMoveType.ATTACK][king_pos] & opp_pawns) != EMPTY_BB:
+            return True
+        n = time.process_time_ns()
+        opp_knights = board.get_piece_bb(Piece.KNIGHT, opp_color)
+        if (self.tables.knight_moves[king_pos] & opp_knights) != EMPTY_BB:
+            return True
+
+        opp_bishops = board.get_piece_bb(Piece.BISHOP, opp_color)
+        opp_rooks = board.get_piece_bb(Piece.ROOK, opp_color)
+        opp_queens = board.get_piece_bb(Piece.QUEEN, opp_color)
+
+        if (self.get_bishop_moves(king_pos, board) & (opp_bishops | opp_queens)) != EMPTY_BB:
+            return True
+        r = time.process_time_ns()
+        if (self.get_rook_moves(king_pos, board) & (opp_rooks | opp_queens)) != EMPTY_BB:
+            return True
+
+        return False
+
+
+
+
+
+
+class MoveGenerationTable(object):
+    def __new__(cls):
+        if not hasattr(cls, 'instance'):
+            cls.instance = super(MoveGenerationTable, cls).__new__(cls)
+        return cls.instance
     def __init__(self):
         self.clear_files = self.generate_clear_files()
         self.clear_ranks = self.generate_clear_ranks()
         self.a1_h8_diag = np.uint64(0x8040201008040201)
         self.h1_a8_antidiag = np.uint64(0x0102040810204080)
+
+        self.rank_masks = self.generate_rank_masks()
+        self.file_masks = self.generate_file_masks()
         self.diag_masks = self.generate_diag_masks()
         self.anti_diag_masks = self.generate_anti_diag_masks()
         # generate moves for each position on board for pawn, knight and king
@@ -52,7 +135,7 @@ class MoveGenerationTable():
 
     def generate_clear_ranks(self):
         bb = np.zeros(8, dtype=np.uint64)
-        bb[0] = 0xFF
+        bb[0] = np.uint64(0xFF)
         for i in range(8):
             bb[i] = bb[0] << np.uint8(8 * i)
         return bb
@@ -181,14 +264,14 @@ class MoveGenerationTable():
 
     def generate_sliding_rank_moves(self, i, occ):
         f = i & np.uint8(7)
-        occ = self.clear_ranks[i] & occ
+        occ = self.rank_masks[i] & occ
         occ = (self.clear_files[File.A] * occ) >> np.uint8(56)
         occ = self.clear_files[File.A] * self.first_rank_moves[f][occ]
-        return self.clear_ranks[i] * occ
+        return self.rank_masks[i] & occ
 
     def generate_diag_masks(self):
-        diag_masks = np.zeros(8, dtype=np.uint64)
-        for i in range(8):
+        diag_masks = np.zeros(64, dtype=np.uint64)
+        for i in range(64):
             diag = 8 * (i & 7) - (i & 56)
             north = -diag & (diag >> 31)
             south = diag & (-diag >> 31)
@@ -196,8 +279,8 @@ class MoveGenerationTable():
         return diag_masks
 
     def generate_anti_diag_masks(self):
-        anti_diag_masks = np.zeros(8, dtype=np.uint64)
-        for i in range(8):
+        anti_diag_masks = np.zeros(64, dtype=np.uint64)
+        for i in range(64):
             diag = 56 - 8 * (i & 7) - (i & 56)
             north = -diag & (diag >> 31)
             south = diag & (-diag >> 31)
@@ -217,6 +300,18 @@ class MoveGenerationTable():
         occ = self.clear_files[File.A] * self.first_rank_moves[f][occ]
         return self.anti_diag_masks[i] & occ
 
+    def generate_rank_masks(self):
+        bb = np.zeros(64, dtype=np.uint64)
+        for i in range(64):
+            bb[i] = self.clear_ranks[i // 8]
+        return bb
+
+    def generate_file_masks(self):
+        bb = np.zeros(64, dtype=np.uint64)
+        for i in range(64):
+            bb[i] = self.clear_files[i % 8]
+        return bb
+
+
 if __name__=="__main__":
     m = MoveGenerator()
-    print(m)

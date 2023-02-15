@@ -31,7 +31,7 @@ def to_bitboard(i):
     :param index:
     :return:
     """
-    return np.uint64(1) << i
+    return np.uint64(1) << np.uint64(i)
 
 def get_occupied_squares(bb):
     """
@@ -63,3 +63,11 @@ def msb_bitscan(bb):
     bb |= bb >> np.uint8(16)
     bb |= bb >> np.uint8(32)
     return msb_lookup[(bb * debruijn) >> np.uint64(58)]
+
+def is_set(square, bb):
+    return to_bitboard(square) & bb != EMPTY_BB
+def set_square(square, bb):
+    return to_bitboard(square) | bb
+
+def clear_square(square, bb):
+    return (~to_bitboard(square)) & bb
