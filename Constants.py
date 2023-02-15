@@ -11,6 +11,9 @@ class Color(IntEnum):
     WHITE=0
     BLACK=1
 
+class Castling(IntEnum):
+    QUEENSIDE=0
+    KINGSIDE=1
 class Piece(IntEnum):
     PAWN=0
     ROOK=1

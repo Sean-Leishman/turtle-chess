@@ -41,7 +41,7 @@ class Game():
                     elif self.is_piece_selected:
                         self.move.set_coord_to(get_coord(pos))
                         print("Make Move")
-                        self.bored = self.board.make_move(self.move)
+                        self.board = self.board.make_move(self.move)
                         print("Move Made")
                         self.is_piece_selected = False
             if self.is_piece_selected:

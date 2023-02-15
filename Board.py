@@ -47,6 +47,9 @@ class Board():
         self.piece_bb = np.zeros((2, 6), dtype=np.uint64)
         self.color_occ = np.zeros(2, dtype=np.uint64)
         self.occ = np.zeros(1, dtype=np.uint64)
+
+        self.has_moved = np.uint64(0x9100000000000091)
+
         self.move_generator = MoveGenerator()
         self.color = Color.WHITE
 
@@ -55,6 +58,8 @@ class Board():
 
         # {WHITE: 0, BLACK: -1}
         self.king_in_check = {0: False, -1: False}
+
+
 
     def initialise_boards(self):
         self.piece_bb[Color.WHITE][Piece.PAWN] = np.uint64(0x000000000000FF00)
@@ -146,9 +151,21 @@ class Board():
             map(lambda x: x.index_from == move.index_from and x.index_to == move.index_to, newBoard.legal_moves))
 
         if not move_exists_in_legal_moves:
-            return False
+            return newBoard
 
         piece = newBoard.get_piece_on(move.index_from)
+
+        if piece == piece.KING:
+            if abs(move.index_from - move.index_to) == 2:
+                # Castling
+                move = list(filter(lambda x: x.index_from == move.index_from and x.index_to == move.index_to,
+                            newBoard.legal_moves))[0]
+                newBoard.clear_square(move.rook_move.index_from)
+                newBoard.set_square(move.rook_move.index_to, piece.ROOK)
+
+                newBoard.has_moved = ~np.uint64(to_bitboard(move.rook_move.index_from)) & newBoard.has_moved
+
+        newBoard.has_moved = ~np.uint64(to_bitboard(move.index_from)) & newBoard.has_moved
 
         newBoard.clear_square(move.index_from)
         newBoard.clear_square(move.index_to, ~newBoard.color)
@@ -170,6 +187,16 @@ class Board():
 
     def apply_move(self, move):
         piece = self.get_piece_on(move.index_from)
+
+        if piece == piece.KING:
+            if abs(move.index_from - move.index_to) == 2:
+                # Castling
+                move = list(filter(lambda x: x.index_from == move.index_from and x.index_to == move.index_to,self.legal_moves))
+                if len(move) == 0:
+                    return self
+                self.clear_square(move.rook_move.index_from)
+                self.set_square(move.rook_move.index_to, piece.ROOK)
+                #self.has_moved = ~move.rook_move.index_from & ~move.index_from & self.has_moved
 
         self.clear_square(move.index_from)
         self.clear_square(move.index_to, ~self.color)

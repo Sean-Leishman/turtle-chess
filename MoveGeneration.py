@@ -4,7 +4,7 @@ import numpy as np
 
 from Constants import *
 from Bitboard import *
-from Move import Move
+from Move import Move, Castle
 
 import time
 class MoveGenerator():
@@ -16,16 +16,50 @@ class MoveGenerator():
         self.tables = MoveGenerationTable()
 
     def get_pawn_moves(self, src, board):
-        attacks, normals = self.tables.pawn_moves[board.color]
-        attacks = attacks[src] & ~board.color_occ[~board.color]
-        normals = normals[src] & board.color_occ[~board.color]
+        normals, attacks = self.tables.pawn_moves[board.color]
+        attacks = attacks[src] & board.color_occ[~board.color]
+        normals = normals[src] & ~board.occ
         return attacks | normals
 
     def get_knight_moves(self, src, board):
         return self.tables.knight_moves[src] & ~board.color_occ[board.color]
 
     def get_king_moves(self, src, board):
-        return self.tables.king_moves[src] & ~board.color_occ[board.color]
+        return (self.tables.king_moves[src] & ~board.color_occ[board.color])
+
+    def get_castling_moves(self, src, board):
+        return self.generate_castling_moves(src, board)
+    def generate_castling_moves(self,src,board):
+        source = np.uint64(to_bitboard(src))
+
+        if src == 4:
+            king_moves = np.uint64(0)
+            rook_original_pos = np.uint64(0)
+            rook_moves = np.uint64(0)
+            for side in Castling:
+                t = self.tables.castling_moves[Color.WHITE][side] ^ self.tables.castling_masks[Color.WHITE][side]
+                occupation = ~board.occ & self.tables.castling_masks[Color.WHITE][side]
+                moved = board.has_moved & self.tables.castling_moves[Color.WHITE][side]
+                if occupation ^ moved == t:
+                    king_moves += source >> np.uint8(2) if side == Castling.QUEENSIDE else source << np.uint8(2)
+                    rook_original_pos += np.uint64(0x1) if side == Castling.QUEENSIDE else np.uint64(0x80)
+                    rook_moves += source >> np.uint8(1) if side == Castling.QUEENSIDE else source << np.uint8(1)
+        elif src == 60:
+            king_moves = np.uint64(0)
+            rook_original_pos = np.uint64(0)
+            rook_moves = np.uint64(0)
+            for side in Castling:
+                t = self.tables.castling_moves[Color.BLACK][side] ^ self.tables.castling_masks[Color.BLACK][side]
+                occupation = ~board.occ & self.tables.castling_masks[Color.BLACK][side]
+                moved = board.has_moved & self.tables.castling_moves[Color.BLACK][side]
+                if occupation ^ moved == t:
+                    king_moves += source >> np.uint8(2) if side == Castling.QUEENSIDE else source << np.uint8(2)
+                    rook_original_pos += np.uint64(0x100000000000000) if side == Castling.QUEENSIDE else np.uint64(0x8000000000000000)
+                    rook_moves += source >> np.uint8(1) if side == Castling.QUEENSIDE else source << np.uint8(1)
+        else:
+            return None
+
+        return king_moves, rook_original_pos, rook_moves
 
     def get_bishop_moves(self, src, board):
         return (self.tables.generate_diag_moves(src, board.occ) ^ self.tables.generate_anti_diag_moves(src, board.occ)) & ~board.color_occ[board.color]
@@ -36,6 +70,7 @@ class MoveGenerator():
         return self.get_rook_moves(src, board) | self.get_bishop_moves(src, board)
     def generate_pseudo_legal_moves(self, board):
         legal_moves = []
+        castling_moves = []
         for piece in Piece:
             piece_bb = board.get_piece_bb(piece)
             for src in get_occupied_squares(piece_bb):
@@ -45,6 +80,11 @@ class MoveGenerator():
                     moveset = self.get_knight_moves(src, board)
                 elif piece == Piece.KING:
                     moveset = self.get_king_moves(src, board)
+                    castling_moveset = self.get_castling_moves(src, board)
+                    if castling_moveset is not None:
+                        for king_to, rook_from, rook_to in zip(get_occupied_squares(castling_moveset[0]), get_occupied_squares(castling_moveset[1]), get_occupied_squares(castling_moveset[2])):
+                            legal_moves.append(Castle(king_index_from=src, king_index_to=king_to, rook_index_from=rook_from, rook_index_to=rook_to))
+                    print(castling_moveset)
                 elif piece == Piece.ROOK:
                     moveset = self.get_rook_moves(src, board)
                 elif piece == Piece.BISHOP:
@@ -53,9 +93,11 @@ class MoveGenerator():
                     moveset = self.get_queen_moves(src, board)
                 else:
                     moveset = []
-
+                print(moveset)
                 for move in get_occupied_squares(moveset):
                     legal_moves.append(Move(index_from=src, index_to=move))
+
+
         end_time = time.process_time_ns()
         return legal_moves
 
@@ -124,6 +166,8 @@ class MoveGenerationTable(object):
         self.knight_moves = self.generate_knight_moves()
         self.pawn_moves = self.generate_pawn_moves()
         self.king_moves = self.generate_king_moves()
+        self.castling_moves = self.generate_possible_castling_moves()
+        self.castling_masks = self.generate_castling_masks()
         self.first_rank_moves = self.generate_first_rank_moves()
 
     def generate_clear_files(self):
@@ -223,6 +267,23 @@ class MoveGenerationTable(object):
             king_pos = king_pos << np.uint8(1)
         return bb
 
+    def generate_castling_masks(self):
+        bb = np.zeros((2, 2), dtype=np.uint64)
+        bb[Color.WHITE][Castling.QUEENSIDE] = np.uint64(0xc)
+        bb[Color.WHITE][Castling.KINGSIDE] = np.uint64(0x60)
+
+        bb[Color.BLACK][Castling.QUEENSIDE] = np.uint64(0xc00000000000000)
+        bb[Color.BLACK][Castling.KINGSIDE] = np.uint64(0x6000000000000000)
+        return bb
+
+    def generate_possible_castling_moves(self):
+        bb = np.zeros((2, 2), dtype=np.uint64)
+        bb[Color.WHITE][Castling.QUEENSIDE] = np.uint64(0x11)
+        bb[Color.WHITE][Castling.KINGSIDE] = np.uint64(0x90)
+
+        bb[Color.BLACK][Castling.QUEENSIDE] = np.uint64(0X1100000000000000)
+        bb[Color.BLACK][Castling.KINGSIDE] = np.uint64(0x9000000000000000)
+        return bb
     def generate_first_rank_moves(self):
         first_rank_moves = np.zeros((8, 256), dtype=np.uint8)
         left_ray = lambda x: x - np.uint8(1)

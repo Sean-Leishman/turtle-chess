@@ -2,7 +2,7 @@ from Bitboard import *
 
 
 class Move():
-    def __init__(self, coord_from=None,  coord_to=None, index_from=None, index_to=None):
+    def __init__(self, coord_from=None, coord_to=None, index_from=None, index_to=None):
         self.coord_from = coord_from
         self.coord_to = coord_to
 
@@ -19,3 +19,10 @@ class Move():
     def set_coord_to(self, coord):
         self.coord_to = coord
         self.index_to = convert_row_col_to_index(*coord)
+
+
+class Castle(Move):
+    def __init__(self, king_index_from=None, king_index_to=None, rook_index_from=None, rook_index_to=None):
+        super().__init__(index_from=king_index_from, index_to=king_index_to)
+        self.king_move = Move(index_from=king_index_from,index_to=king_index_to)
+        self.rook_move = Move(index_from=rook_index_from, index_to=rook_index_to)
