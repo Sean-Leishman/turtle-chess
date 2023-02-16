@@ -65,7 +65,7 @@ def msb_bitscan(bb):
     return msb_lookup[(bb * debruijn) >> np.uint64(58)]
 
 def is_set(square, bb):
-    return to_bitboard(square) & bb != EMPTY_BB
+    return (to_bitboard(square) & bb) != EMPTY_BB
 def set_square(square, bb):
     return to_bitboard(square) | bb
 

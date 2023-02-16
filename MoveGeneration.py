@@ -17,9 +17,17 @@ class MoveGenerator():
 
     def get_pawn_moves(self, src, board):
         normals, attacks = self.tables.pawn_moves[board.color]
-        attacks = attacks[src] & board.color_occ[~board.color]
-        normals = normals[src] & ~board.occ
-        return attacks | normals
+
+        shifted_attacks = (board.color_occ[~board.color] & board.en_passant_mask[~board.color]) << np.uint8(8) if board.color == Color.WHITE else (board.color_occ[~board.color] & board.en_passant_mask[~board.color]) >> np.uint8(8)
+        attack_moves = attacks[src] & board.color_occ[~board.color]
+        en_passant_attacks = attacks[src] & shifted_attacks
+
+        space_ahead_free = to_bitboard(src+8) & board.occ == EMPTY_BB if board.color == Color.WHITE else to_bitboard(src-8) & board.occ == EMPTY_BB
+        if space_ahead_free:
+            normals = normals[src] & ~board.occ
+        else:
+            normals = np.uint8(0)
+        return attack_moves | normals, en_passant_attacks
 
     def get_knight_moves(self, src, board):
         return self.tables.knight_moves[src] & ~board.color_occ[board.color]
@@ -75,7 +83,11 @@ class MoveGenerator():
             piece_bb = board.get_piece_bb(piece)
             for src in get_occupied_squares(piece_bb):
                 if piece == Piece.PAWN:
-                    moveset = self.get_pawn_moves(src, board)
+                    moveset, en_passant = self.get_pawn_moves(src, board)
+                    for move in get_occupied_squares(en_passant):
+                        legal_moves.append(Move(index_from=src, index_to=move, en_passant=True))
+
+
                 elif piece == Piece.KNIGHT:
                     moveset = self.get_knight_moves(src, board)
                 elif piece == Piece.KING:
@@ -84,7 +96,6 @@ class MoveGenerator():
                     if castling_moveset is not None:
                         for king_to, rook_from, rook_to in zip(get_occupied_squares(castling_moveset[0]), get_occupied_squares(castling_moveset[1]), get_occupied_squares(castling_moveset[2])):
                             legal_moves.append(Castle(king_index_from=src, king_index_to=king_to, rook_index_from=rook_from, rook_index_to=rook_to))
-                    print(castling_moveset)
                 elif piece == Piece.ROOK:
                     moveset = self.get_rook_moves(src, board)
                 elif piece == Piece.BISHOP:
@@ -93,7 +104,6 @@ class MoveGenerator():
                     moveset = self.get_queen_moves(src, board)
                 else:
                     moveset = []
-                print(moveset)
                 for move in get_occupied_squares(moveset):
                     legal_moves.append(Move(index_from=src, index_to=move))
 
@@ -102,16 +112,36 @@ class MoveGenerator():
         return legal_moves
 
     def generate_legal_moves(self, board):
-        return list(filter(lambda x: not self.king_is_attacked(deepcopy(board), x), self.generate_pseudo_legal_moves(board)))
+
+        normal_moves = [x for x in self.generate_pseudo_legal_moves(board) if isinstance(x,Move)]
+        castling_moves = [x for x in self.generate_pseudo_legal_moves(board) if isinstance(x,Castle)]
+
+        normal_moves = list(filter(lambda x: not self.king_is_attacked(deepcopy(board), x), normal_moves))
+        castling_moves = list(filter(lambda x: self.king_is_attacked_while_castling(deepcopy(board), x), castling_moves))
+
+        return normal_moves + castling_moves
+
+    def king_is_attacked_while_castling(self, board, move):
+        inter_move = Move(index_from=move.index_from, index_to=int(move.index_from + (move.king_move.index_to - move.king_move.index_from) // 2))
+        if self.king_is_attacked(deepcopy(board)):
+            return False
+        elif self.king_is_attacked(deepcopy(board), inter_move):
+            return False
+        elif self.king_is_attacked(deepcopy(board), move.king_move):
+            return False
+        return True
+
 
     def king_is_attacked(self, board, move=None, color=None):
-        if move is not None:
-            board = board.apply_move(move)
-
         if color is None:
             color = board.color
 
-        board.color = ~board.color
+        if move is not None:
+            board = board.apply_move(move, color=board.color)
+        else:
+            board.color = ~board.color
+        print("KING IS ATTACKED", move, board.color, board.get_piece_bb(Piece.BISHOP),board.get_piece_bb(Piece.KING))
+
         king_bb = board.get_piece_bb(Piece.KING)
         king_pos = get_occupied_squares(king_bb)
 
@@ -125,7 +155,7 @@ class MoveGenerator():
         opp_pawns = board.get_piece_bb(Piece.PAWN, opp_color)
         if (self.tables.pawn_moves[color][PawnMoveType.ATTACK][king_pos] & opp_pawns) != EMPTY_BB:
             return True
-        n = time.process_time_ns()
+
         opp_knights = board.get_piece_bb(Piece.KNIGHT, opp_color)
         if (self.tables.knight_moves[king_pos] & opp_knights) != EMPTY_BB:
             return True
@@ -133,10 +163,10 @@ class MoveGenerator():
         opp_bishops = board.get_piece_bb(Piece.BISHOP, opp_color)
         opp_rooks = board.get_piece_bb(Piece.ROOK, opp_color)
         opp_queens = board.get_piece_bb(Piece.QUEEN, opp_color)
-
+        print("BISHOP MOVES",self.get_bishop_moves(king_pos, board))
         if (self.get_bishop_moves(king_pos, board) & (opp_bishops | opp_queens)) != EMPTY_BB:
             return True
-        r = time.process_time_ns()
+
         if (self.get_rook_moves(king_pos, board) & (opp_rooks | opp_queens)) != EMPTY_BB:
             return True
 
@@ -234,12 +264,12 @@ class MoveGenerationTable(object):
 
         rank_mask = lambda color, i: self.clear_ranks[i] if color == Color.WHITE else self.clear_ranks[7 - i]
 
-        shift_fowards_left = lambda color, bb, i: bb << np.uint64(7) if color == Color.WHITE else bb >> np.uint64(7)
-        shift_fowards_right = lambda color, bb, i: bb << np.uint64(9) if color == Color.WHITE else bb >> np.uint64(9)
+        shift_fowards_left = lambda color, bb, i: bb << np.uint64(7) if color == Color.WHITE else bb >> np.uint64(9)
+        shift_fowards_right = lambda color, bb, i: bb << np.uint64(9) if color == Color.WHITE else bb >> np.uint64(7)
 
         for i in range(64):
-            pawn_clip_file_a = pawn_loc & ~self.clear_files[0] & ~rank_mask(color, 0)
-            pawn_clip_file_h = pawn_loc & ~self.clear_files[7] & ~rank_mask(color, 0)
+            pawn_clip_file_a = pawn_loc & ~self.clear_files[File.A] & ~rank_mask(color, 0)
+            pawn_clip_file_h = pawn_loc & ~self.clear_files[File.H] & ~rank_mask(color, 0)
             shift_left = shift_fowards_left(color, pawn_clip_file_a, 1).astype(np.uint64)
             shift_right = shift_fowards_right(color, pawn_clip_file_h, 1).astype(np.uint64)
             bb[i] = shift_left | shift_right

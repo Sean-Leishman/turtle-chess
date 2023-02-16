@@ -59,6 +59,8 @@ class Board():
         # {WHITE: 0, BLACK: -1}
         self.king_in_check = {0: False, -1: False}
 
+        self.en_passant_mask = np.zeros(2, dtype=np.uint64)
+
 
 
     def initialise_boards(self):
@@ -155,6 +157,8 @@ class Board():
 
         piece = newBoard.get_piece_on(move.index_from)
 
+        newBoard.en_passant_mask[~newBoard.color] = EMPTY_BB
+
         if piece == piece.KING:
             if abs(move.index_from - move.index_to) == 2:
                 # Castling
@@ -164,6 +168,20 @@ class Board():
                 newBoard.set_square(move.rook_move.index_to, piece.ROOK)
 
                 newBoard.has_moved = ~np.uint64(to_bitboard(move.rook_move.index_from)) & newBoard.has_moved
+        elif piece == piece.PAWN:
+            white_promote = to_bitboard(move.index_from) & self.move_generator.tables.clear_ranks[
+                Rank.SEVEN] != EMPTY_BB
+            black_promote = to_bitboard(move.index_from) & self.move_generator.tables.clear_ranks[Rank.TWO] != EMPTY_BB
+            if abs(move.index_from - move.index_to) == 16:
+                newBoard.en_passant_mask[newBoard.color] = to_bitboard(move.index_to)
+            elif move.index_from // 8 == 4 or move.index_from // 8 == 5:
+                move = list(filter(lambda x: x.index_from == move.index_from and x.index_to == move.index_to,
+                                   newBoard.legal_moves))[0]
+                if move.en_passant:
+                    newBoard.clear_square(move.index_to - 8 if newBoard.color == Color.WHITE else move.index_to + 8, ~newBoard.color)
+            elif (newBoard.color == Color.WHITE and white_promote) or (newBoard.color != Color.WHITE and black_promote):
+                piece = Piece.QUEEN
+
 
         newBoard.has_moved = ~np.uint64(to_bitboard(move.index_from)) & newBoard.has_moved
 
@@ -178,14 +196,16 @@ class Board():
 
         newBoard.king_in_check[newBoard.color] = newBoard.move_generator.king_is_attacked(copyBoard)
         newBoard.king_in_check[~newBoard.color] = False
-        print(newBoard.king_in_check)
         newBoard.legal_moves = newBoard.find_moves()
         newBoard.format_board.update_board(newBoard.piece_bb, newBoard.king_in_check)
         newBoard.format_board.update_legal_moves(newBoard.legal_moves)
 
         return newBoard
 
-    def apply_move(self, move):
+    def apply_move(self, move, color):
+        if color == None:
+            color = self.color
+
         piece = self.get_piece_on(move.index_from)
 
         if piece == piece.KING:
@@ -198,11 +218,23 @@ class Board():
                 self.set_square(move.rook_move.index_to, piece.ROOK)
                 #self.has_moved = ~move.rook_move.index_from & ~move.index_from & self.has_moved
 
-        self.clear_square(move.index_from)
+        elif piece == piece.PAWN:
+            if abs(move.index_from - move.index_to) == 16:
+                self.en_passant_mask[self.color] = to_bitboard(move.index_to)
+            elif move.index_from // 8 == 4 or move.index_from // 8 == 5:
+                move = list(filter(lambda x: x.index_from == move.index_from and x.index_to == move.index_to,
+                                   self.legal_moves))
+                if len(move) == 0:
+                    return self
+                if move.en_passant:
+                    self.clear_square(move.index_to - 8 if self.color == Color.WHITE else move.index_to + 8, ~self.color)
+
+
+        self.clear_square(move.index_from, self.color)
         self.clear_square(move.index_to, ~self.color)
         self.set_square(move.index_to, piece)
 
-        self.color = ~self.color
+        #self.color = ~self.color
         return self
 
 if __name__ == "__main__":
