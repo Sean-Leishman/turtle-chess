@@ -139,8 +139,10 @@ class MoveGenerator():
         if move is not None:
             board = board.apply_move(move, color=board.color)
         else:
+            print("NONE")
             board.color = ~board.color
-        print("KING IS ATTACKED", move, board.color, board.get_piece_bb(Piece.BISHOP),board.get_piece_bb(Piece.KING))
+
+        print("KING IS ATTACKED", move, board.color, board.get_piece_bb(Piece.PAWN),board.get_piece_bb(Piece.KING))
 
         king_bb = board.get_piece_bb(Piece.KING)
         king_pos = get_occupied_squares(king_bb)
@@ -153,7 +155,8 @@ class MoveGenerator():
         king_pos = king_pos[0]
 
         opp_pawns = board.get_piece_bb(Piece.PAWN, opp_color)
-        if (self.tables.pawn_moves[color][PawnMoveType.ATTACK][king_pos] & opp_pawns) != EMPTY_BB:
+        print("PAWN MOVES", opp_pawns, king_pos, board.color, self.tables.pawn_moves[opp_color][PawnMoveType.ATTACK][king_pos])
+        if (self.tables.pawn_moves[board.color][PawnMoveType.ATTACK][king_pos] & opp_pawns) != EMPTY_BB:
             return True
 
         opp_knights = board.get_piece_bb(Piece.KNIGHT, opp_color)
@@ -163,7 +166,6 @@ class MoveGenerator():
         opp_bishops = board.get_piece_bb(Piece.BISHOP, opp_color)
         opp_rooks = board.get_piece_bb(Piece.ROOK, opp_color)
         opp_queens = board.get_piece_bb(Piece.QUEEN, opp_color)
-        print("BISHOP MOVES",self.get_bishop_moves(king_pos, board))
         if (self.get_bishop_moves(king_pos, board) & (opp_bishops | opp_queens)) != EMPTY_BB:
             return True
 
@@ -250,9 +252,8 @@ class MoveGenerationTable(object):
         shift_fowards = lambda color,bb, i: bb << np.uint64(8*i) if color == Color.WHITE else bb >> np.uint64(8*i)
         rank_mask = lambda color, i: self.clear_ranks[i] if color == Color.WHITE else self.clear_ranks[7-i]
         for i in range(64):
-            pawn_clip_first_rank = pawn_loc & ~rank_mask(color, 0)
             pawn_second_rank = pawn_loc & rank_mask(color, 1)
-            shift_one = shift_fowards(color,pawn_clip_first_rank, 1).astype(np.uint64)
+            shift_one = shift_fowards(color,pawn_loc, 1).astype(np.uint64)
             shift_two = shift_fowards(color, pawn_second_rank, 2).astype(np.uint64)
             bb[i] = (shift_one | shift_two).astype(np.uint64)
             pawn_loc = pawn_loc << np.uint8(1)
@@ -268,8 +269,8 @@ class MoveGenerationTable(object):
         shift_fowards_right = lambda color, bb, i: bb << np.uint64(9) if color == Color.WHITE else bb >> np.uint64(7)
 
         for i in range(64):
-            pawn_clip_file_a = pawn_loc & ~self.clear_files[File.A] & ~rank_mask(color, 0)
-            pawn_clip_file_h = pawn_loc & ~self.clear_files[File.H] & ~rank_mask(color, 0)
+            pawn_clip_file_a = pawn_loc & ~self.clear_files[File.A]
+            pawn_clip_file_h = pawn_loc & ~self.clear_files[File.H]
             shift_left = shift_fowards_left(color, pawn_clip_file_a, 1).astype(np.uint64)
             shift_right = shift_fowards_right(color, pawn_clip_file_h, 1).astype(np.uint64)
             bb[i] = shift_left | shift_right
