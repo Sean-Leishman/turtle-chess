@@ -112,9 +112,9 @@ class MoveGenerator():
         return legal_moves
 
     def generate_legal_moves(self, board):
-
-        normal_moves = [x for x in self.generate_pseudo_legal_moves(board) if isinstance(x,Move)]
-        castling_moves = [x for x in self.generate_pseudo_legal_moves(board) if isinstance(x,Castle)]
+        pseudo_legal_moves = self.generate_pseudo_legal_moves(board)
+        normal_moves = [x for x in  pseudo_legal_moves if not hasattr(x,"rook_move")]
+        castling_moves = [x for x in pseudo_legal_moves if hasattr(x,"rook_move")]
 
         normal_moves = list(filter(lambda x: not self.king_is_attacked(deepcopy(board), x), normal_moves))
         castling_moves = list(filter(lambda x: self.king_is_attacked_while_castling(deepcopy(board), x), castling_moves))
@@ -123,7 +123,8 @@ class MoveGenerator():
 
     def king_is_attacked_while_castling(self, board, move):
         inter_move = Move(index_from=move.index_from, index_to=int(move.index_from + (move.king_move.index_to - move.king_move.index_from) // 2))
-        if self.king_is_attacked(deepcopy(board)):
+        if self.king_is_attacked(deepcopy(board), Move(index_from=0, index_to=0)):
+
             return False
         elif self.king_is_attacked(deepcopy(board), inter_move):
             return False

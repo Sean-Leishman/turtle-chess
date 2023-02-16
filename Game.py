@@ -36,8 +36,8 @@ class Game():
                     pos = pygame.mouse.get_pos()
                     if not self.is_piece_selected:
                         self.move.set_coord_from(get_coord(pos))
-                        # TODO Check piece exists at position
-                        self.is_piece_selected = True
+                        if self.board.get_format_board()[self.move.coord_from[0]][self.move.coord_from[1]] != None:
+                            self.is_piece_selected = True
                     elif self.is_piece_selected:
                         self.move.set_coord_to(get_coord(pos))
                         print("Make Move")
