@@ -61,3 +61,8 @@ class PawnMoveType(IntEnum):
     NORMAL = 0
     ATTACK = 1
 
+class GameState(IntEnum):
+    NORMAL = 0
+    STALEMATE = 1
+    CHECKMATE = 2
+

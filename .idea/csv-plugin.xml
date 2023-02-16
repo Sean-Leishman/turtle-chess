@@ -87,6 +87,13 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\Search.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\Square.py">
           <value>
             <Attribute>

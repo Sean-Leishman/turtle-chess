@@ -140,10 +140,7 @@ class MoveGenerator():
         if move is not None:
             board = board.apply_move(move, color=board.color)
         else:
-            print("NONE")
             board.color = ~board.color
-
-        print("KING IS ATTACKED", move, board.color, board.get_piece_bb(Piece.PAWN),board.get_piece_bb(Piece.KING))
 
         king_bb = board.get_piece_bb(Piece.KING)
         king_pos = get_occupied_squares(king_bb)
@@ -156,7 +153,6 @@ class MoveGenerator():
         king_pos = king_pos[0]
 
         opp_pawns = board.get_piece_bb(Piece.PAWN, opp_color)
-        print("PAWN MOVES", opp_pawns, king_pos, board.color, self.tables.pawn_moves[opp_color][PawnMoveType.ATTACK][king_pos])
         if (self.tables.pawn_moves[board.color][PawnMoveType.ATTACK][king_pos] & opp_pawns) != EMPTY_BB:
             return True
 

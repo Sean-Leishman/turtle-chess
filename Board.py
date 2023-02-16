@@ -61,6 +61,8 @@ class Board():
 
         self.en_passant_mask = np.zeros(2, dtype=np.uint64)
 
+        self.game_state = GameState.NORMAL
+
 
 
     def initialise_boards(self):
@@ -137,6 +139,14 @@ class Board():
         self.color_occ[color] = clear_square(sq, color_occ)
         self.occ = clear_square(sq, all_occ)
 
+    def is_end_of_game(self):
+        print(self.legal_moves, self.color, self.king_in_check)
+        if len(self.legal_moves) == 0 and self.king_in_check[self.color]:
+            return GameState.CHECKMATE
+        elif len(self.legal_moves) == 0 and not self.king_in_check[self.color]:
+            return GameState.STALEMATE
+        else:
+            return GameState.NORMAL
     def make_move(self, move, inplace=True):
         if not inplace:
             newBoard = Board()
@@ -169,9 +179,9 @@ class Board():
 
                 newBoard.has_moved = ~np.uint64(to_bitboard(move.rook_move.index_from)) & newBoard.has_moved
         elif piece == piece.PAWN:
-            white_promote = to_bitboard(move.index_from) & self.move_generator.tables.clear_ranks[
+            white_promote = to_bitboard(move.index_from) & newBoard.move_generator.tables.clear_ranks[
                 Rank.SEVEN] != EMPTY_BB
-            black_promote = to_bitboard(move.index_from) & self.move_generator.tables.clear_ranks[Rank.TWO] != EMPTY_BB
+            black_promote = to_bitboard(move.index_from) & newBoard.move_generator.tables.clear_ranks[Rank.TWO] != EMPTY_BB
             if abs(move.index_from - move.index_to) == 16:
                 newBoard.en_passant_mask[newBoard.color] = to_bitboard(move.index_to)
             elif move.index_from // 8 == 4 or move.index_from // 8 == 5:
@@ -197,6 +207,7 @@ class Board():
         newBoard.king_in_check[newBoard.color] = newBoard.move_generator.king_is_attacked(copyBoard)
         newBoard.king_in_check[~newBoard.color] = False
         newBoard.legal_moves = newBoard.find_moves()
+        newBoard.game_state = newBoard.is_end_of_game()
         newBoard.format_board.update_board(newBoard.piece_bb, newBoard.king_in_check)
         newBoard.format_board.update_legal_moves(newBoard.legal_moves)
 
@@ -226,9 +237,9 @@ class Board():
                                    self.legal_moves))
                 if len(move) == 0:
                     return self
+                move = move[0]
                 if move.en_passant:
                     self.clear_square(move.index_to - 8 if self.color == Color.WHITE else move.index_to + 8, ~self.color)
-
 
         self.clear_square(move.index_from, self.color)
         self.clear_square(move.index_to, ~self.color)
