@@ -9,11 +9,15 @@ from Bitboard import *
 from Search import Search
 import math
 
+coord_offset = lambda x: (3.5 - x) * 2
+
 def get_coord(pos):
-    cord = [0] * 2
-    for i in range(len(pos)):
-        cord[i] = math.floor(pos[i] / SQUARE_SIZE)
-    return cord
+    print(pos)
+    coord = [0] * 2
+    coord[0] = math.floor(pos[1] / SQUARE_SIZE)
+    coord[0] = int(coord[0] + coord_offset(coord[0]))
+    coord[1] = math.floor(pos[0] / SQUARE_SIZE)
+    return coord
 
 def parse_move(move):
     return Move(index_from=move.from_square, index_to=move.to_square)
