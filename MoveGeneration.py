@@ -95,7 +95,7 @@ class MoveGenerator():
                     castling_moveset = self.get_castling_moves(src, board)
                     if castling_moveset is not None:
                         for king_to, rook_from, rook_to in zip(get_occupied_squares(castling_moveset[0]), get_occupied_squares(castling_moveset[1]), get_occupied_squares(castling_moveset[2])):
-                            legal_moves.append(Castle(king_index_from=src, king_index_to=king_to, rook_index_from=rook_from, rook_index_to=rook_to))
+                            legal_moves.append(Castle(king_index_from=int(src), king_index_to=int(king_to), rook_index_from=int(rook_from), rook_index_to=int(rook_to)))
                 elif piece == Piece.ROOK:
                     moveset = self.get_rook_moves(src, board)
                 elif piece == Piece.BISHOP:
@@ -113,7 +113,7 @@ class MoveGenerator():
 
     def generate_legal_moves(self, board):
         pseudo_legal_moves = self.generate_pseudo_legal_moves(board)
-        normal_moves = [x for x in  pseudo_legal_moves if not hasattr(x,"rook_move")]
+        normal_moves = [x for x in pseudo_legal_moves if not hasattr(x,"rook_move")]
         castling_moves = [x for x in pseudo_legal_moves if hasattr(x,"rook_move")]
 
         normal_moves = list(filter(lambda x: not self.king_is_attacked(deepcopy(board), x), normal_moves))
@@ -122,9 +122,9 @@ class MoveGenerator():
         return normal_moves + castling_moves
 
     def king_is_attacked_while_castling(self, board, move):
-        inter_move = Move(index_from=move.index_from, index_to=int(move.index_from + (move.king_move.index_to - move.king_move.index_from) // 2))
+        id = int(move.index_from + (move.king_move.index_to - move.king_move.index_from) // 2)
+        inter_move = Move(index_from=move.index_from, index_to=id)
         if self.king_is_attacked(deepcopy(board), Move(index_from=0, index_to=0)):
-
             return False
         elif self.king_is_attacked(deepcopy(board), inter_move):
             return False
@@ -138,7 +138,7 @@ class MoveGenerator():
             color = board.color
 
         if move is not None:
-            board = board.apply_move(move, color=board.color)
+            board = board.apply_move(move, flexible=True, color=board.color)
         else:
             board.color = ~board.color
 

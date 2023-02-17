@@ -45,6 +45,13 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\Evaluation.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\GUI.py">
           <value>
             <Attribute>

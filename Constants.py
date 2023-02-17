@@ -69,4 +69,5 @@ class GameState(IntEnum):
 class GameType(IntEnum):
     USER = 0
     COMPUTER = 1
+    SIMULATION = 2
 

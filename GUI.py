@@ -5,6 +5,7 @@ import numpy as np
 from Constants import *
 import svgutils
 import io
+from Bitboard import *
 
 
 def load_and_scale_svg(filename, scale):
@@ -34,12 +35,14 @@ def load_and_scale_svg(filename, scale):
     svg_string = open('svgNew.svg', "rt").read()
     return pygame.image.load(io.BytesIO(svg_string.encode()))
 
+height_offset = lambda x: ((3.5 - x) * 2) * SQUARE_SIZE
 def load_img(filename):
     return load_and_scale_svg(filename, SQUARE_SIZE / 45)
 
 class GUI():
     def __init__(self):
         self.screen = pygame.display.set_mode((WIDTH,HEIGHT))
+        self.surface = pygame.Surface(self.screen.get_rect().size, pygame.SRCALPHA, 32)
         self.piecesImg = self.init_pieces_img()
 
     def init_pieces_img(self):
@@ -61,16 +64,21 @@ class GUI():
                 Piece.PAWN: load_img("Images\\Chess_pdt45.svg"),
             }}
 
-    def draw_window(self, board, legal_moves, selected_piece=None):
-        height_offset = lambda x: ((3.5 - x) * 2) * SQUARE_SIZE
+    def draw_window(self, formatted_board, selected_piece=None):
+
+        board = formatted_board.get_board()
+        legal_moves = formatted_board.get_legal_moves()
+        last_move = formatted_board.get_last_move()
+
+        self.surface.fill(0)
+        self.screen.fill(0)
+
         for i in range(8):
             for j in range(8):
-                if i == 0 and j == 4 or i == 7 and j == 4:
-                    op = 0
                 if i % 2 == 0 and j % 2 == 0 or i % 2 == 1 and j % 2 ==1:
-                    pygame.draw.rect(self.screen,(153, 102, 51),(j*SQUARE_SIZE,i*SQUARE_SIZE + height_offset(i),SQUARE_SIZE,SQUARE_SIZE))
+                    pygame.draw.rect(self.screen,(153, 102, 51, .5),(j*SQUARE_SIZE,i*SQUARE_SIZE + height_offset(i),SQUARE_SIZE,SQUARE_SIZE))
                 else:
-                    pygame.draw.rect(self.screen, (255, 204, 153), (j * SQUARE_SIZE, i*SQUARE_SIZE + height_offset(i), SQUARE_SIZE, SQUARE_SIZE))
+                    pygame.draw.rect(self.screen, (255, 204, 153, .5), (j * SQUARE_SIZE, i*SQUARE_SIZE + height_offset(i), SQUARE_SIZE, SQUARE_SIZE))
                 if board[i][j] is not None:
                     self.screen.blit(self.piecesImg[board[i][j][0]][board[i][j][1]],
                                      pygame.Rect(int(j * SQUARE_SIZE), int(i * SQUARE_SIZE + height_offset(i)), SQUARE_SIZE, SQUARE_SIZE))
@@ -92,6 +100,21 @@ class GUI():
                                  (move[1] * SQUARE_SIZE, move[0] * SQUARE_SIZE +
                                   height_offset(move[0]), SQUARE_SIZE, SQUARE_SIZE),
                                  2)
+        if last_move is not None:
+            row_from,col_from = convert_index_to_row_col(last_move.index_from)
+            row_to, col_to = convert_index_to_row_col(last_move.index_to)
+
+
+
+            target_rect1 = pygame.Rect((col_from * SQUARE_SIZE, row_from * SQUARE_SIZE + height_offset(row_from)),(SQUARE_SIZE, SQUARE_SIZE))
+            target_rect2 = pygame.Rect((col_to * SQUARE_SIZE, row_to * SQUARE_SIZE + height_offset(row_to)),
+                                       (SQUARE_SIZE, SQUARE_SIZE))
+            shape_surface = pygame.Surface(target_rect1.size, pygame.SRCALPHA)
+            pygame.draw.rect(shape_surface, (171, 214, 248, 127),
+                             shape_surface.get_rect())
+            self.surface.blit(shape_surface, target_rect1)
+            self.surface.blit(shape_surface, target_rect2)
         #self.screen.blit(pygame.transform.rotate(self.screen, 180), (0, 0))
+        self.screen.blit(self.surface, (0,0))
         pygame.display.update()
 

@@ -71,3 +71,10 @@ def set_square(square, bb):
 
 def clear_square(square, bb):
     return (~to_bitboard(square)) & bb
+
+def pop_count(bb):
+    count = np.uint8(0)
+    while bb != EMPTY_BB:
+        count += np.uint8(1)
+        bb &= bb - np.uint64(1)
+    return count
