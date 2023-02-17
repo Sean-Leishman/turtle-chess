@@ -89,6 +89,18 @@ class Board():
         self.legal_moves = self.find_moves()
         self.format_board.update_legal_moves(self.legal_moves)
 
+    def has_kingside_castling_rights(self, color):
+        if color == Color.WHITE:
+            return ((np.uint64(0x90) & self.has_moved) ^ np.uint64(0x90)) == EMPTY_BB
+        elif color == Color.BLACK:
+            return ((np.uint64(0x9000000000000000) & self.has_moved) ^ np.uint64(0x9000000000000000)) == EMPTY_BB
+
+    def has_queenside_castling_rights(self, color):
+        if color == Color.WHITE:
+            return ((np.uint64(0x11) & self.has_moved) ^ np.uint64(0x11)) == EMPTY_BB
+        elif color == Color.BLACK:
+            return ((np.uint64(0x1100000000000000) & self.has_moved) ^ np.uint64(0x1100000000000000)) == EMPTY_BB
+
     def get_format_board(self):
         return self.format_board.get_board()
 

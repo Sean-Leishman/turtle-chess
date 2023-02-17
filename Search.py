@@ -4,6 +4,7 @@ from copy import deepcopy
 from MoveGeneration import MoveGenerator
 from Model import Model
 from Bitboard import *
+import Polyglot
 
 COLOR_CONVERT = {
     -1: -1,
@@ -27,13 +28,21 @@ class Search():
 
     def find_best_move(self, board):
         max_score = 0
-        for move in self.move_generator.generate_legal_moves(board):
-            node = board.make_move(move)
-            score = self.minimax(node, 1, 2, True, -math.inf, math.inf)
-            if score > max_score:
-                max_score = score
-                best_move = move
-        print(best_move)
+        found_move = False
+        moves = []
+        with Polyglot.open_reader("Perfect2017.bin") as reader:
+            for entry in reader.find_all(board):
+                print(entry.move, entry.weight)
+                moves.append(entry)
+                found_move = True
+        if not found_move:
+            for move in self.move_generator.generate_legal_moves(board):
+                node = board.make_move(move)
+                score = self.minimax(node, 1, 2, True, -math.inf, math.inf)
+                if score > max_score:
+                    max_score = score
+                    best_move = move
+        return moves[0]
 
     def minimax(self, node, curr_depth, max_depth, isMaximisingPlayer, alpha, beta):
         if curr_depth == max_depth:

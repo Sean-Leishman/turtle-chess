@@ -16,9 +16,9 @@ class Castling(IntEnum):
     KINGSIDE=1
 class Piece(IntEnum):
     PAWN=0
-    ROOK=1
-    KNIGHT=2
-    BISHOP=3
+    KNIGHT=1
+    BISHOP=2
+    ROOK=3
     QUEEN=4
     KING=5
 
@@ -65,4 +65,8 @@ class GameState(IntEnum):
     NORMAL = 0
     STALEMATE = 1
     CHECKMATE = 2
+
+class GameType(IntEnum):
+    USER = 0
+    COMPUTER = 1
 
