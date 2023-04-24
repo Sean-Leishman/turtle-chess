@@ -16,6 +16,21 @@ class FormattedBoard():
     def get_board(self):
         return self.board
 
+    def __str__(self):
+        string = ""
+        for i in range(len(self.board) - 1, -1, -1):
+            string += "----------------------------\n"
+            for j in range(len(self.board[i])):
+                if self.board[i][j] is not None and Color(self.board[i][j][0]) == Color.WHITE:
+                    string += f"| {Piece(self.board[i][j][1]).name[0]} "
+                elif self.board[i][j] is not None:
+                    string += f"| {Piece(self.board[i][j][1]).name[0].lower()} "
+                else:
+                    string += "|   "
+            string += "|\n"
+        string += "------------------------------\n"
+        return string
+
     def update_board(self, bb, king_in_check):
         self.board = [[None] * 8 for i in range(8)]
         for color in Color:
@@ -73,8 +88,15 @@ class Board():
 
         self.history = []
 
+        self.fb = FormattedBoard()
+
+    def __str__(self):
+        self.fb.update_board(self.piece_bb, self.king_in_check)
+        return str(self.fb)
+
     def set_board(self, piece_bb, is_castled, color):
         self.piece_bb = piece_bb
+        self.color_occ = self.color_occ & EMPTY_BB
         for p in Piece:
             for c in Color:
                 self.color_occ[c] |= self.piece_bb[c][p]
@@ -235,7 +257,7 @@ class Board():
         newBoard.legal_moves = newBoard.find_moves()
         newBoard.game_state = newBoard.is_end_of_game()
 
-        newBoard.history.append(move)
+        newBoard.history.append(copy.deepcopy(move))
         newBoard.format_board.update_board(newBoard.piece_bb, newBoard.king_in_check)
         newBoard.format_board.update_legal_moves(newBoard.legal_moves)
         newBoard.format_board.update_last_move(newBoard.history[-1])
@@ -252,11 +274,14 @@ class Board():
             if not flexible and abs(move.index_from - move.index_to) == 2:
                 # Castling
                 move = list(filter(lambda x: x.index_from == move.index_from and x.index_to == move.index_to,
-                            self.legal_moves))[0]
-                self.clear_square(move.rook_move.index_from)
-                self.set_square(move.rook_move.index_to, piece.ROOK)
-                self.has_moved = ~np.uint64(to_bitboard(move.rook_move.index_from)) & self.has_moved
-                self.is_castled[self.color] = True
+                            self.legal_moves))
+                if len(move) > 0:
+                    self.clear_square(move.rook_move.index_from)
+                    self.set_square(move.rook_move.index_to, piece.ROOK)
+                    self.has_moved = ~np.uint64(to_bitboard(move.rook_move.index_from)) & self.has_moved
+                    self.is_castled[self.color] = True
+                else:
+                    return self
         elif piece == piece.PAWN:
             white_promote = to_bitboard(move.index_from) & self.move_generator.tables.clear_ranks[
                 Rank.SEVEN] != EMPTY_BB
@@ -273,7 +298,8 @@ class Board():
         self.clear_square(move.index_to, ~self.color)
         self.set_square(move.index_to, piece)
 
-        #self.color = ~self.color
+        if not flexible:
+            self.color = ~self.color
         return self
 
 if __name__ == "__main__":

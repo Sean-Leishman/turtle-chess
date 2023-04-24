@@ -16,6 +16,9 @@ class Move():
     def __str__(self):
         return f"Move from {self.coord_from}/{self.index_from} to {self.coord_to}/{self.index_to}"
 
+    def __repr__(self):
+        return f"Move from {self.coord_from}/{self.index_from} to {self.coord_to}/{self.index_to}"
+
     def set_coord_from(self, coord):
         self.coord_from = coord
         self.index_from = convert_row_col_to_index(*coord)

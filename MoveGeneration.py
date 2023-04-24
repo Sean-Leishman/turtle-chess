@@ -111,6 +111,9 @@ class MoveGenerator():
         end_time = time.process_time_ns()
         return legal_moves
 
+    """
+    TODO: Get rid of deep copies and instead make then reverse move. 
+    """
     def generate_legal_moves(self, board):
         pseudo_legal_moves = self.generate_pseudo_legal_moves(board)
         normal_moves = [x for x in pseudo_legal_moves if not hasattr(x,"rook_move")]
