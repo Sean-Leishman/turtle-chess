@@ -164,7 +164,7 @@ class Board():
         if color is None:
             color = self.color
 
-        piece_bb = self.get_piece_bb(piece)
+        piece_bb = self.piece_bb[color][piece]
         color_bb = self.color_occ[color]
         all_bb = self.occ
 
@@ -172,15 +172,16 @@ class Board():
         self.color_occ[color] = set_square(sq, color_bb)
         self.occ = set_square(sq, all_bb)
 
-    def clear_square(self, sq, color=None):
+    def clear_square(self, sq, piece=None,color=None):
         if color is None:
             color = self.color
 
-        piece = self.get_piece_on(sq)
         if piece is None:
-            return
+            piece = self.get_piece_on(sq)
+            if piece is None:
+                return
 
-        piece_bb = self.get_piece_bb(piece, color)
+        piece_bb = self.piece_bb[color][piece]
         color_occ = self.color_occ[color]
         all_occ = self.occ
 
@@ -246,15 +247,20 @@ class Board():
         newBoard.has_moved = ~np.uint64(to_bitboard(move.index_from)) & newBoard.has_moved
 
         newBoard.clear_square(move.index_from)
-        newBoard.clear_square(move.index_to, ~newBoard.color)
+        newBoard.clear_square(move.index_to, color=~newBoard.color)
         newBoard.set_square(move.index_to, piece)
 
         newBoard.color = ~newBoard.color
 
+        piece_bb = np.copy(newBoard.piece_bb)
+        has_castled = copy.copy(newBoard.is_castled)
+        color = copy.copy(newBoard.color)
+
         copyBoard = copy.deepcopy(newBoard)
         copyBoard.color = ~copyBoard.color
 
-        newBoard.king_in_check[newBoard.color] = newBoard.move_generator.king_is_attacked(copyBoard)
+        newBoard.king_in_check[newBoard.color] = newBoard.move_generator.king_is_attacked(newBoard)
+        newBoard.set_board(piece_bb, has_castled, color)
         newBoard.king_in_check[~newBoard.color] = False
         newBoard.legal_moves = newBoard.find_moves()
         newBoard.game_state = newBoard.is_end_of_game()
@@ -275,9 +281,8 @@ class Board():
         if piece == piece.KING:
             if not flexible and abs(move.index_from - move.index_to) == 2:
                 # Castling
-                move = list(filter(lambda x: x.index_from == move.index_from and x.index_to == move.index_to,
-                            self.legal_moves))
-                if len(move) > 0:
+                #move = list(filter(lambda x: x.index_from == move.index_from and x.index_to == move.index_to,self.legal_moves))
+                if move is not None:
                     self.clear_square(move.rook_move.index_from)
                     self.set_square(move.rook_move.index_to, piece.ROOK)
                     self.has_moved = ~np.uint64(to_bitboard(move.rook_move.index_from)) & self.has_moved
@@ -285,6 +290,7 @@ class Board():
                 else:
                     return self
         elif piece == piece.PAWN:
+            """
             white_promote = to_bitboard(move.index_from) & self.move_generator.tables.clear_ranks[
                 Rank.SEVEN] != EMPTY_BB
             black_promote = to_bitboard(move.index_from) & self.move_generator.tables.clear_ranks[Rank.TWO] != EMPTY_BB
@@ -295,9 +301,10 @@ class Board():
                     self.clear_square(move.index_to - 8 if self.color == Color.WHITE else move.index_to + 8, ~self.color)
             elif (self.color == Color.WHITE and white_promote) or (self.color != Color.WHITE and black_promote):
                 piece = Piece.QUEEN
+            """
 
-        self.clear_square(move.index_from, self.color)
-        self.clear_square(move.index_to, ~self.color)
+        self.clear_square(move.index_from, piece, self.color)
+        self.clear_square(move.index_to, piece, ~self.color)
         self.set_square(move.index_to, piece)
 
         if not flexible:

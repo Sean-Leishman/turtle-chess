@@ -80,7 +80,7 @@ class Search():
 
             mm_s = time.process_time_ns()
 
-            score = self.minimax(node, 0, 3, False, -math.inf, math.inf)
+            score = self.minimax(node, 0, 2, False, -math.inf, math.inf)
             node.set_board(piece_bb, has_castled, color)
 
             mm_e = time.process_time_ns()
@@ -91,7 +91,7 @@ class Search():
             if score > max_score:
                 max_score = score
                 best_move = move
-
+        """
         print(self.timings)
         print(sum(self.timings["openings"])/len(self.timings['openings']))
         print(sum(self.timings["move"]) / len(self.timings['move']))
@@ -101,7 +101,7 @@ class Search():
         print(sum(self.timings["makemove"]) / len(self.timings['makemove']) / 1e9)
         print(sum(self.timings["setboard"]) / len(self.timings['setboard']) / 1e9)
         print("NODES", self.nodes)
-
+        """
         return best_move
 
     def minimax(self, node, curr_depth, max_depth, isMaximisingPlayer, alpha, beta):
@@ -123,9 +123,6 @@ class Search():
 
             for move in legal_moves:
                 piece_bb = np.copy(node.piece_bb)
-                color_occ = np.copy(node.color_occ)
-                occ = np.copy(node.occ)
-
                 has_castled = copy(node.is_castled)
                 color = copy(node.color)
 

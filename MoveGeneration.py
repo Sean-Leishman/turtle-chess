@@ -15,6 +15,9 @@ class MoveGenerator():
     def __init__(self):
         self.tables = MoveGenerationTable()
 
+        self.timings = {"genpseudo":[],"seperate":[],"king_attack1":[],"king_attack2":[], "checks":[],
+                        "applymove":[],"piece_bb":[],"setboard":[]}
+
     def get_pawn_moves(self, src, board):
         normals, attacks = self.tables.pawn_moves[board.color]
 
@@ -115,53 +118,63 @@ class MoveGenerator():
     TODO: Get rid of deep copies and instead make then reverse move. 
     """
     def generate_legal_moves(self, board):
-        piece_bb = np.copy(board.piece_bb)
-        color = copy(board.color)
-        has_castled = copy(board.is_castled)
-
+        mm_s = time.process_time_ns()
         pseudo_legal_moves = self.generate_pseudo_legal_moves(board)
+        mm_e = time.process_time_ns()
+        self.timings['genpseudo'].append(mm_e-mm_s)
+
+        mm_s = time.process_time_ns()
         normal_moves = [x for x in pseudo_legal_moves if not hasattr(x,"rook_move")]
         castling_moves = [x for x in pseudo_legal_moves if hasattr(x,"rook_move")]
+        mm_e = time.process_time_ns()
+        self.timings['seperate'].append(mm_e - mm_s)
 
+        mm_s = time.process_time_ns()
         normal_moves = list(filter(lambda x: not self.king_is_attacked(board, x), normal_moves))
-        board.set_board(piece_bb, has_castled, color)
+        mm_e = time.process_time_ns()
+        self.timings['king_attack1'].append(mm_e - mm_s)
 
+        mm_s = time.process_time_ns()
         castling_moves = list(filter(lambda x: self.king_is_attacked_while_castling(board, x), castling_moves))
-        board.set_board(piece_bb, has_castled, color)
+        mm_e = time.process_time_ns()
+        self.timings['king_attack2'].append(mm_e - mm_s)
 
-        return sorted(normal_moves + castling_moves, key=lambda x: x.index_to % 32 )
+        """
+        print("Psudo",sum(self.timings["genpseudo"]) / len(self.timings['genpseudo']))
+        print("Seperate",sum(self.timings["seperate"]) / len(self.timings['seperate']))
+        print("Attack1",sum(self.timings["king_attack1"]) / len(self.timings['king_attack1']), len(self.timings['king_attack1']))
+        print("Attack2",sum(self.timings["king_attack2"]) / len(self.timings['king_attack2']))
+        print("Apply Move", sum(self.timings["applymove"]) / len(self.timings['applymove']), len(self.timings['applymove']))
+        print("Piece bb", sum(self.timings["piece_bb"]) / len(self.timings['piece_bb']))
+        print("Set Board", sum(self.timings["setboard"]) / len(self.timings['setboard']))
+        #return sorted(normal_moves + castling_moves, key=lambda x: x.index_to % 32 )
+        """
+        return normal_moves + castling_moves
 
     def king_is_attacked_while_castling(self, board, move):
-        piece_bb = np.copy(board.piece_bb)
-        color = copy(board.color)
-        has_castled = copy(board.is_castled)
-
         id = int(move.index_from + (move.king_move.index_to - move.king_move.index_from) // 2)
         inter_move = Move(index_from=move.index_from, index_to=id)
 
         if self.king_is_attacked(board, Move(index_from=0, index_to=0)):
             return False
-        board.set_board(piece_bb, has_castled, color)
 
         if self.king_is_attacked(board, inter_move):
             return False
-        board.set_board(piece_bb, has_castled, color)
 
         if self.king_is_attacked(board, move.king_move):
             return False
-        board.set_board(piece_bb, has_castled, color)
 
         return True
 
+    def king_is_attacked_with_move(self, board, move):
+        piece_bb = np.copy(board.piece_bb)
+        color = copy(board.color)
+        has_castled = copy(board.is_castled)
 
-    def king_is_attacked(self, board, move=None, color=None):
-        if color is None:
-            color = board.color
-
-        if move is not None:
-            board = board.apply_move(move, flexible=True, color=board.color)
-        else:
-            board.color = ~board.color
+        mm_s = time.process_time_ns()
+        board = board.apply_move(move, flexible=True, color=board.color)
+        mm_e = time.process_time_ns()
+        self.timings['applymove'].append(mm_e - mm_s)
 
         king_bb = board.get_piece_bb(Piece.KING)
         king_pos = get_occupied_squares(king_bb)
@@ -173,24 +186,63 @@ class MoveGenerator():
 
         king_pos = king_pos[0]
 
+        mm_s = time.process_time_ns()
         opp_pawns = board.get_piece_bb(Piece.PAWN, opp_color)
-        if (self.tables.pawn_moves[board.color][PawnMoveType.ATTACK][king_pos] & opp_pawns) != EMPTY_BB:
-            return True
-
         opp_knights = board.get_piece_bb(Piece.KNIGHT, opp_color)
-        if (self.tables.knight_moves[king_pos] & opp_knights) != EMPTY_BB:
-            return True
-
         opp_bishops = board.get_piece_bb(Piece.BISHOP, opp_color)
         opp_rooks = board.get_piece_bb(Piece.ROOK, opp_color)
         opp_queens = board.get_piece_bb(Piece.QUEEN, opp_color)
-        if (self.get_bishop_moves(king_pos, board) & (opp_bishops | opp_queens)) != EMPTY_BB:
+        mm_e = time.process_time_ns()
+        self.timings['piece_bb'].append(mm_e - mm_s)
+
+        mm_s = time.process_time_ns()
+        pawn_check = (self.tables.pawn_moves[board.color][PawnMoveType.ATTACK][king_pos] & opp_pawns) != EMPTY_BB
+        knight_check = (self.tables.knight_moves[king_pos] & opp_knights) != EMPTY_BB
+        bishop_check = (self.get_bishop_moves(king_pos, board) & (opp_bishops | opp_queens)) != EMPTY_BB
+        rook_check = (self.get_rook_moves(king_pos, board) & (opp_rooks | opp_queens)) != EMPTY_BB
+        mm_e = time.process_time_ns()
+        self.timings['checks'].append(mm_e - mm_s)
+
+        mm_s = time.process_time_ns()
+        board.set_board(piece_bb, has_castled, color)
+        mm_e = time.process_time_ns()
+        self.timings['setboard'].append(mm_e - mm_s)
+        return pawn_check | knight_check | rook_check | bishop_check
+
+    def king_is_attacked_without_move(self,board):
+        king_bb = board.get_piece_bb(Piece.KING)
+        king_pos = get_occupied_squares(king_bb)
+
+        opp_color = ~board.color
+
+        if len(king_pos) < 1:
             return True
 
-        if (self.get_rook_moves(king_pos, board) & (opp_rooks | opp_queens)) != EMPTY_BB:
-            return True
+        king_pos = king_pos[0]
 
-        return False
+        opp_pawns = board.get_piece_bb(Piece.PAWN, opp_color)
+        opp_knights = board.get_piece_bb(Piece.KNIGHT, opp_color)
+        opp_bishops = board.get_piece_bb(Piece.BISHOP, opp_color)
+        opp_rooks = board.get_piece_bb(Piece.ROOK, opp_color)
+        opp_queens = board.get_piece_bb(Piece.QUEEN, opp_color)
+
+        pawn_check = (self.tables.pawn_moves[board.color][PawnMoveType.ATTACK][king_pos] & opp_pawns) != EMPTY_BB
+        knight_check = (self.tables.knight_moves[king_pos] & opp_knights) != EMPTY_BB
+        bishop_check = (self.get_bishop_moves(king_pos, board) & (opp_bishops | opp_queens)) != EMPTY_BB
+        rook_check = (self.get_rook_moves(king_pos, board) & (opp_rooks | opp_queens)) != EMPTY_BB
+
+        return pawn_check | knight_check | bishop_check | rook_check
+    def king_is_attacked(self, board, move=None, color=None):
+        if color is None:
+            color = board.color
+
+        if move is not None:
+            self.king_is_attacked_with_move(board,move)
+        else:
+            board.color = ~board.color
+            self.king_is_attacked_without_move(board)
+
+
 
 
 
