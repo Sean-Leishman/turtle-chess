@@ -276,7 +276,7 @@ class ZobristHasher:
 
             ep_mask = ep_mask << np.uint8(1) | ep_mask >> np.uint8(1)
 
-            if ep_mask & board.piece_bb[Piece.PAWN] & board.color_occ[board.color]:
+            if ep_mask[board.color] & board.piece_bb[board.color][Piece.PAWN]:
                 return self.array[772 + convert_index_to_row_col(get_occupied_squares(ep_mask)[0])[0]]
         return 0
 

@@ -71,3 +71,4 @@ class GameType(IntEnum):
     COMPUTER = 1
     SIMULATION = 2
 
+

@@ -214,8 +214,10 @@ class Board():
             return newBoard
 
         piece = newBoard.get_piece_on(move.index_from)
-
-        newBoard.en_passant_mask[~newBoard.color] = EMPTY_BB
+        try:
+            newBoard.en_passant_mask[~newBoard.color] = EMPTY_BB
+        except:
+            pass
 
         if piece == piece.KING:
             if abs(move.index_from - move.index_to) == 2:

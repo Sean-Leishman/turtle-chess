@@ -80,7 +80,7 @@ class Search():
 
             mm_s = time.process_time_ns()
 
-            score = self.minimax(node, 0, 1, False, -math.inf, math.inf)
+            score = self.minimax(node, 0, 3, False, -math.inf, math.inf)
             node.set_board(piece_bb, has_castled, color)
 
             mm_e = time.process_time_ns()

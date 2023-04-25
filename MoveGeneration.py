@@ -1,4 +1,4 @@
-from copy import deepcopy
+from copy import deepcopy, copy
 
 import numpy as np
 
@@ -115,24 +115,42 @@ class MoveGenerator():
     TODO: Get rid of deep copies and instead make then reverse move. 
     """
     def generate_legal_moves(self, board):
+        piece_bb = np.copy(board.piece_bb)
+        color = copy(board.color)
+        has_castled = copy(board.is_castled)
+
         pseudo_legal_moves = self.generate_pseudo_legal_moves(board)
         normal_moves = [x for x in pseudo_legal_moves if not hasattr(x,"rook_move")]
         castling_moves = [x for x in pseudo_legal_moves if hasattr(x,"rook_move")]
 
-        normal_moves = list(filter(lambda x: not self.king_is_attacked(deepcopy(board), x), normal_moves))
-        castling_moves = list(filter(lambda x: self.king_is_attacked_while_castling(deepcopy(board), x), castling_moves))
+        normal_moves = list(filter(lambda x: not self.king_is_attacked(board, x), normal_moves))
+        board.set_board(piece_bb, has_castled, color)
 
-        return normal_moves + castling_moves
+        castling_moves = list(filter(lambda x: self.king_is_attacked_while_castling(board, x), castling_moves))
+        board.set_board(piece_bb, has_castled, color)
+
+        return sorted(normal_moves + castling_moves, key=lambda x: x.index_to % 32 )
 
     def king_is_attacked_while_castling(self, board, move):
+        piece_bb = np.copy(board.piece_bb)
+        color = copy(board.color)
+        has_castled = copy(board.is_castled)
+
         id = int(move.index_from + (move.king_move.index_to - move.king_move.index_from) // 2)
         inter_move = Move(index_from=move.index_from, index_to=id)
-        if self.king_is_attacked(deepcopy(board), Move(index_from=0, index_to=0)):
+
+        if self.king_is_attacked(board, Move(index_from=0, index_to=0)):
             return False
-        elif self.king_is_attacked(deepcopy(board), inter_move):
+        board.set_board(piece_bb, has_castled, color)
+
+        if self.king_is_attacked(board, inter_move):
             return False
-        elif self.king_is_attacked(deepcopy(board), move.king_move):
+        board.set_board(piece_bb, has_castled, color)
+
+        if self.king_is_attacked(board, move.king_move):
             return False
+        board.set_board(piece_bb, has_castled, color)
+
         return True
 
 
