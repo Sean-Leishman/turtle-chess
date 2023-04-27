@@ -108,7 +108,10 @@ class MoveGenerator():
                 else:
                     moveset = []
                 for move in get_occupied_squares(moveset):
-                    legal_moves.append(Move(index_from=src, index_to=move))
+                    if (to_bitboard(move) & board.color_occ[board.color] == EMPTY_BB):
+                        legal_moves.append(Move(index_from=src, index_to=move))
+                    else:
+                        legal_moves.append(Move(index_from=src, index_to=move, is_capture=True))
 
 
         end_time = time.process_time_ns()
@@ -237,17 +240,13 @@ class MoveGenerator():
             color = board.color
 
         if move is not None:
-            self.king_is_attacked_with_move(board,move)
+            return self.king_is_attacked_with_move(board,move)
         else:
-            board.color = ~board.color
-            self.king_is_attacked_without_move(board)
+            #board.color = ~board.color
+            return self.king_is_attacked_without_move(board)
 
-
-
-
-
-
-
+    def sort_moves(self, moves):
+        return sorted(moves, key=lambda x: x.is_capture, reverse=True)
 
 class MoveGenerationTable(object):
     def __new__(cls):

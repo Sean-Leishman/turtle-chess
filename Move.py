@@ -2,7 +2,7 @@ from Bitboard import *
 
 
 class Move():
-    def __init__(self, coord_from=None, coord_to=None, index_from=None, index_to=None, en_passant=False, promo=None):
+    def __init__(self, coord_from=None, coord_to=None, index_from=None, index_to=None, en_passant=False, promo=None, is_capture=False):
         self.coord_from = coord_from
         self.coord_to = coord_to
 
@@ -12,6 +12,7 @@ class Move():
         self.en_passant = en_passant
 
         self.promo = promo
+        self.is_capture = is_capture
 
     def __str__(self):
         return f"Move from {self.coord_from}/{self.index_from} to {self.coord_to}/{self.index_to}"

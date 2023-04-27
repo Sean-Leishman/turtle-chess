@@ -118,6 +118,7 @@ class Search():
 
             mm_s = time.process_time_ns()
             legal_moves = self.move_generator.generate_legal_moves(node)
+            legal_moves = self.move_generator.sort_moves(legal_moves)
             mm_e = time.process_time_ns()
             self.timings["movegen"].append(mm_e - mm_s)
 
