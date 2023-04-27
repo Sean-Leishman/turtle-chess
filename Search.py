@@ -7,6 +7,8 @@ from Model import Model
 from Bitboard import *
 from Evaluation import Evaluation
 from Move import Move
+from TranspositionTable import TranspositionTable
+from Zobrist import Zobrist, POLYGLOT_RANDOM_ARRAY
 import Polyglot
 from memory_profiler import profile
 
@@ -40,6 +42,8 @@ class Search():
         self.openings_book = Polyglot.open_reader("Perfect2017.bin")
         self.model_mode = False
 
+        self.transpose_table = TranspositionTable()
+
         self.nodes = 0
 
 
@@ -49,7 +53,6 @@ class Search():
         max_score = -math.inf
         found_move = False
         moves = []
-        op_time = time.process_time_ns()
         if not self.model_mode:
             for entry in self.openings_book.find_all(board):
                 moves.append(entry)
@@ -59,39 +62,12 @@ class Search():
             else:
                 self.model_mode = False
 
-        op_end = time.process_time_ns()
-        self.timings["openings"].append(op_end-op_time)
-
-        if board.legal_moves == []:
-            print("CHECKMATE")
-        print(len(board.legal_moves), board.legal_moves)
-        legal_moves = self.move_generator.sort_moves(board.legal_moves)
-        for move in legal_moves:
-            am_s = time.process_time_ns()
-
-            piece_bb = np.copy(board.piece_bb)
-            has_castled = copy(board.is_castled)
-            color = copy(board.color)
-            node = board.apply_move(move)
-
-            am_e = time.process_time_ns()
-            self.timings["move"].append(am_e - am_s)
-
-            self.nodes += 1
-
-            mm_s = time.process_time_ns()
-
-            score = self.minimax(node, 0, 2, False, -math.inf, math.inf)
-            node.set_board(piece_bb, has_castled, color)
-
-            mm_e = time.process_time_ns()
-            self.timings["mm"].append(mm_e - mm_s)
-
-            #print(score, move)
-
-            if score > max_score:
-                max_score = score
-                best_move = move
+        # Iterative Deepening Search
+        current_depth = 0
+        initial_depth = 0
+        for d in range(1,3):
+            current_depth = d + initial_depth
+            next_move = self.init_minimax(board, current_depth)
         """
         print(self.timings)
         print(sum(self.timings["openings"])/len(self.timings['openings']))
@@ -103,44 +79,80 @@ class Search():
         print(sum(self.timings["setboard"]) / len(self.timings['setboard']) / 1e9)
         print("NODES", self.nodes)
         """
-        return best_move
+        self.transpose_table.clear()
+        return next_move
+
+    def order_moves(self, board, legal_moves):
+        legal_moves = sorted(legal_moves, key=lambda x: x.is_capture, reverse=True)
+        values = []
+
+        for move in legal_moves:
+            piece_bb = np.copy(board.piece_bb)
+            has_castled = copy(board.is_castled)
+            color = copy(board.color)
+
+            board.apply_move(move)
+            ttnode = self.transpose_table[board]
+            if ttnode is not None and ttnode.value != math.inf and ttnode.value is not None:
+                values.append(ttnode.value)
+            else:
+                values.append(0)
+            board.set_board(piece_bb, has_castled, color)
+
+        return [x for _, x in sorted(zip(values, legal_moves), key=lambda x: x[0], reverse=True)]
+
+    def init_minimax(self, board, current_depth):
+        legal_moves = self.move_generator.generate_legal_moves(board)
+        legal_moves = self.order_moves(board, legal_moves)
+
+        bestVal = -math.inf
+        bestMove = None
+        for move in legal_moves:
+            piece_bb = np.copy(board.piece_bb)
+            has_castled = copy(board.is_castled)
+            color = copy(board.color)
+            node = board.apply_move(move)
+
+            self.nodes += 1
+
+            score = self.minimax(node, 1, current_depth, False, -math.inf, math.inf)
+            node.set_board(piece_bb, has_castled, color)
+
+            if score > bestVal:
+                bestVal = score
+                bestMove = move
+        return bestMove
 
     def minimax(self, node, curr_depth, max_depth, isMaximisingPlayer, alpha, beta):
+        legal_moves = self.move_generator.generate_legal_moves(node)
+        legal_moves = self.order_moves(node, legal_moves)
+
         if curr_depth == max_depth:
             #score = self.model.predict_scores(convert_to_ml_boards(node))
-            mm_s = time.process_time_ns()
-            score = self.evaluator.evaluate(node)
-            mm_e = time.process_time_ns()
-            self.timings["evaluator"].append(mm_e - mm_s)
+            score = -self.evaluator.evaluate(node)
+            ttnode = self.transpose_table[node]
+
+            if ttnode is not None:
+                if ttnode.value < score or ttnode.value == math.inf:
+                    ttnode.update(value=score)
+            else:
+                self.transpose_table.put(node, score)
             return score
 
         if isMaximisingPlayer:
             bestVal = -math.inf
-
-            mm_s = time.process_time_ns()
-            legal_moves = self.move_generator.generate_legal_moves(node)
-            legal_moves = self.move_generator.sort_moves(legal_moves)
-            mm_e = time.process_time_ns()
-            self.timings["movegen"].append(mm_e - mm_s)
 
             for move in legal_moves:
                 piece_bb = np.copy(node.piece_bb)
                 has_castled = copy(node.is_castled)
                 color = copy(node.color)
 
-
-                mm_s = time.process_time_ns()
                 node.apply_move(move)
-                mm_e = time.process_time_ns()
-                self.timings["makemove"].append(mm_e - mm_s)
 
                 self.nodes += 1
                 value = self.minimax(node, curr_depth+1, max_depth, not isMaximisingPlayer, alpha, beta)
 
-                mm_s = time.process_time_ns()
                 node.set_board(piece_bb, has_castled, color)
-                mm_e = time.process_time_ns()
-                self.timings["setboard"].append(mm_e - mm_s)
 
                 bestVal = max(bestVal, value)
                 alpha = max(bestVal, alpha)
@@ -151,28 +163,17 @@ class Search():
         else:
             bestVal = math.inf
 
-            mm_s = time.process_time_ns()
-            legal_moves = self.move_generator.generate_legal_moves(node)
-            mm_e = time.process_time_ns()
-            self.timings["movegen"].append(mm_e - mm_s)
-
             for move in legal_moves:
                 piece_bb = np.copy(node.piece_bb)
                 has_castled = copy(node.is_castled)
                 color = copy(node.color)
 
-                mm_s = time.process_time_ns()
                 node.apply_move(move)
-                mm_e = time.process_time_ns()
-                self.timings["makemove"].append(mm_e - mm_s)
 
                 self.nodes += 1
                 value = self.minimax(node, curr_depth + 1, max_depth, not isMaximisingPlayer, alpha, beta)
 
-                mm_s = time.process_time_ns()
                 node.set_board(piece_bb, has_castled, color)
-                mm_e = time.process_time_ns()
-                self.timings["setboard"].append(mm_e - mm_s)
 
 
                 bestVal = min(bestVal, value)
@@ -180,3 +181,4 @@ class Search():
                 if beta <= alpha:
                     break
             return bestVal
+

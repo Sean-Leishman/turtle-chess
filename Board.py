@@ -82,6 +82,7 @@ class Board():
         self.king_in_check = {0: False, -1: False}
         self.is_castled = {0: False, -1: False}
 
+
         self.en_passant_mask = np.zeros(2, dtype=np.uint64)
 
         self.game_state = GameState.NORMAL
@@ -255,9 +256,6 @@ class Board():
         piece_bb = np.copy(newBoard.piece_bb)
         has_castled = copy.copy(newBoard.is_castled)
         color = copy.copy(newBoard.color)
-
-        copyBoard = copy.deepcopy(newBoard)
-        copyBoard.color = ~copyBoard.color
 
         newBoard.king_in_check[newBoard.color] = newBoard.move_generator.king_is_attacked(newBoard)
         newBoard.set_board(piece_bb, has_castled, color)

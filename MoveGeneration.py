@@ -1,3 +1,4 @@
+import math
 from copy import deepcopy, copy
 
 import numpy as np
@@ -7,13 +8,14 @@ from Bitboard import *
 from Move import Move, Castle
 
 import time
+
+from TranspositionTable import TranspositionTable
+
+
 class MoveGenerator():
-    def __new__(cls):
-        if not hasattr(cls, 'instance'):
-            cls.instance = super(MoveGenerator, cls).__new__(cls)
-        return cls.instance
     def __init__(self):
         self.tables = MoveGenerationTable()
+        self.transpose_table = TranspositionTable()
 
         self.timings = {"genpseudo":[],"seperate":[],"king_attack1":[],"king_attack2":[], "checks":[],
                         "applymove":[],"piece_bb":[],"setboard":[]}
@@ -117,42 +119,30 @@ class MoveGenerator():
         end_time = time.process_time_ns()
         return legal_moves
 
-    """
-    TODO: Get rid of deep copies and instead make then reverse move. 
-    """
-    def generate_legal_moves(self, board):
-        mm_s = time.process_time_ns()
+    def generate_legal_moves_in_new_position(self, board):
         pseudo_legal_moves = self.generate_pseudo_legal_moves(board)
-        mm_e = time.process_time_ns()
-        self.timings['genpseudo'].append(mm_e-mm_s)
+        normal_moves = [x for x in pseudo_legal_moves if not hasattr(x, "rook_move")]
+        castling_moves = [x for x in pseudo_legal_moves if hasattr(x, "rook_move")]
 
-        mm_s = time.process_time_ns()
-        normal_moves = [x for x in pseudo_legal_moves if not hasattr(x,"rook_move")]
-        castling_moves = [x for x in pseudo_legal_moves if hasattr(x,"rook_move")]
-        mm_e = time.process_time_ns()
-        self.timings['seperate'].append(mm_e - mm_s)
-
-        mm_s = time.process_time_ns()
         normal_moves = list(filter(lambda x: not self.king_is_attacked(board, x), normal_moves))
-        mm_e = time.process_time_ns()
-        self.timings['king_attack1'].append(mm_e - mm_s)
-
-        mm_s = time.process_time_ns()
         castling_moves = list(filter(lambda x: self.king_is_attacked_while_castling(board, x), castling_moves))
-        mm_e = time.process_time_ns()
-        self.timings['king_attack2'].append(mm_e - mm_s)
 
-        """
-        print("Psudo",sum(self.timings["genpseudo"]) / len(self.timings['genpseudo']))
-        print("Seperate",sum(self.timings["seperate"]) / len(self.timings['seperate']))
-        print("Attack1",sum(self.timings["king_attack1"]) / len(self.timings['king_attack1']), len(self.timings['king_attack1']))
-        print("Attack2",sum(self.timings["king_attack2"]) / len(self.timings['king_attack2']))
-        print("Apply Move", sum(self.timings["applymove"]) / len(self.timings['applymove']), len(self.timings['applymove']))
-        print("Piece bb", sum(self.timings["piece_bb"]) / len(self.timings['piece_bb']))
-        print("Set Board", sum(self.timings["setboard"]) / len(self.timings['setboard']))
-        #return sorted(normal_moves + castling_moves, key=lambda x: x.index_to % 32 )
-        """
         return normal_moves + castling_moves
+    def generate_legal_moves(self, board):
+        node = self.transpose_table[board]
+        if node is not None:
+            if node.legal_moves == [] or node.legal_moves is None:
+                legal_moves = self.generate_legal_moves_in_new_position(board)
+                node.update(legal_moves=legal_moves)
+                return legal_moves
+            else:
+                return node.legal_moves
+        else:
+            legal_moves = self.generate_legal_moves_in_new_position(board)
+            self.transpose_table.put(board, math.inf, legal_moves)
+            return legal_moves
+
+
 
     def king_is_attacked_while_castling(self, board, move):
         id = int(move.index_from + (move.king_move.index_to - move.king_move.index_from) // 2)
@@ -244,9 +234,6 @@ class MoveGenerator():
         else:
             #board.color = ~board.color
             return self.king_is_attacked_without_move(board)
-
-    def sort_moves(self, moves):
-        return sorted(moves, key=lambda x: x.is_capture, reverse=True)
 
 class MoveGenerationTable(object):
     def __new__(cls):

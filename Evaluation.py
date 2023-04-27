@@ -11,6 +11,8 @@ from MoveGeneration import MoveGenerator
 
 CENTER = np.uint64(0x3c3c3c3c0000)
 
+
+#Todo Figure out evaluation so that can find best move for whatever piece colour
 class Score(IntEnum):
     PAWN = np.int32(100)
     KNIGHT = np.int32(300)
@@ -29,14 +31,11 @@ class Evaluation():
         self.color = color
 
     def evaluate(self, board: Board):
-        if self.color == Color.WHITE:
-            return self.eval_pieces(board) + self.eval_center(board) #+ self.eval_moves(board) + self.eval_castled(board)
-        else:
-            return -1 * (self.eval_pieces(board) + self.eval_center(board)) #+ self.eval_moves(board) + self.eval_castled(board)
+        return self.eval_pieces(board) + self.eval_center(board) #+ self.eval_moves(board) + self.eval_castled(board)
 
     def piece_diff(self, board: Board, piece: Piece):
-        return np.int32(pop_count(board.piece_bb[board.color][piece])) - np.int32(
-            pop_count(board.piece_bb[~board.color][piece]))
+        return np.int32(pop_count(board.piece_bb[0][piece])) - np.int32(
+            pop_count(board.piece_bb[-1][piece]))
 
     def eval_pieces(self, board: Board):
         return (Score.PAWN.value * self.piece_diff(board, Piece.PAWN)
@@ -46,7 +45,7 @@ class Evaluation():
                 + Score.QUEEN.value * self.piece_diff(board, Piece.QUEEN))
 
     def eval_center(self, board: Board):
-        return Score.CENTER.value * pop_count(board.color_occ[board.color] & CENTER)
+        return Score.CENTER.value * pop_count(board.color_occ[-1] & CENTER)
 
     def eval_moves(self, board: Board):
         num = len(list(self.move_generator.generate_legal_moves(board)))

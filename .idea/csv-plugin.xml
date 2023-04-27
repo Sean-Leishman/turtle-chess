@@ -115,6 +115,13 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\TranspositionTable.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\main.py">
           <value>
             <Attribute>
