@@ -108,7 +108,7 @@ class MoveGenerator():
                 else:
                     moveset = []
                 for move in get_occupied_squares(moveset):
-                    if (to_bitboard(move) & board.color_occ[board.color] == EMPTY_BB):
+                    if (to_bitboard(move) & board.color_occ[~board.color] == EMPTY_BB):
                         legal_moves.append(Move(index_from=src, index_to=move))
                     else:
                         legal_moves.append(Move(index_from=src, index_to=move, is_capture=True))

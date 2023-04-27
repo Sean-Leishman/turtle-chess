@@ -304,7 +304,7 @@ class Board():
             """
 
         self.clear_square(move.index_from, piece, self.color)
-        self.clear_square(move.index_to, piece, ~self.color)
+        self.clear_square(move.index_to, color=~self.color)
         self.set_square(move.index_to, piece)
 
         if not flexible:

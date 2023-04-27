@@ -65,7 +65,8 @@ class Search():
         if board.legal_moves == []:
             print("CHECKMATE")
         print(len(board.legal_moves), board.legal_moves)
-        for move in board.legal_moves:
+        legal_moves = self.move_generator.sort_moves(board.legal_moves)
+        for move in legal_moves:
             am_s = time.process_time_ns()
 
             piece_bb = np.copy(board.piece_bb)

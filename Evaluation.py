@@ -23,12 +23,16 @@ class Score(IntEnum):
     MOVE = np.int32(5)
 
 class Evaluation():
-    def __init__(self):
+    def __init__(self, color=Color.BLACK):
         self.score = -math.inf
         self.move_generator = MoveGenerator()
+        self.color = color
 
     def evaluate(self, board: Board):
-        return self.eval_pieces(board) + self.eval_center(board) #+ self.eval_moves(board) + self.eval_castled(board)
+        if self.color == Color.WHITE:
+            return self.eval_pieces(board) + self.eval_center(board) #+ self.eval_moves(board) + self.eval_castled(board)
+        else:
+            return -1 * (self.eval_pieces(board) + self.eval_center(board)) #+ self.eval_moves(board) + self.eval_castled(board)
 
     def piece_diff(self, board: Board, piece: Piece):
         return np.int32(pop_count(board.piece_bb[board.color][piece])) - np.int32(

@@ -23,7 +23,7 @@ class Game():
     def __init__(self):
         pygame.init()
         self.board = Board()
-        self.game_type = GameType.USER
+        self.game_type = GameType.COMPUTER
 
         self.is_piece_selected = False
         self.selected_piece = None
