@@ -12,7 +12,7 @@ Implementation of game rules using python and represents the board via bitboards
 - [ ] Transposition Tables 
 
 ## Instructions
-Run `python pip install -r requirements.txt`
+Run `python pip install -r requirements.txt` <br />
 Run `python Controller.py`
 
 ## Read more 
