@@ -13,7 +13,7 @@ Implementation of game rules using python and represents the board via bitboards
 
 ## Instructions
 Run `python pip install -r requirements.txt` <br />
-Run `python Controller.py`
+Run `python Game.py`
 
 ## Read more 
 Find out more here at my [blog](https://www.blog.seanleishman.com/projects/chess/)
