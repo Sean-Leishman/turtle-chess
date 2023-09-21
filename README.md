@@ -9,7 +9,7 @@ Implementation of game rules using python and represents the board via bitboards
 - [x] Opening book
 - [x] Minimax
 - [x] Iterative Deepening 
-- [] Transposition Tables 
+- [ ] Transposition Tables 
 
 ## Instructions
 Run `python pip install -r requirements.txt`
